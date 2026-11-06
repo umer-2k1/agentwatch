@@ -31,16 +31,22 @@ pub struct ProviderInfo {
 
 impl Store {
     pub fn new() -> Self {
+        Self::with_window(12)
+    }
+
+    /// `hours` of transcript history that counts as live.
+    pub fn with_window(hours: i64) -> Self {
         Self {
             // v0.1: Claude Code only. Each future agent is one more line here and one more
             // file in providers/ (D-003).
-            providers: vec![Box::new(ClaudeProvider::new())],
+            providers: vec![Box::new(ClaudeProvider::with_window(hours))],
             liveness: Liveness::new(),
             settings: Settings::default(),
             last: Vec::new(),
         }
     }
 
+    #[allow(dead_code)] // read by the settings UI in M0.3
     pub fn settings(&self) -> Settings {
         self.settings
     }

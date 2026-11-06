@@ -18,6 +18,8 @@ pub enum Verification {
     /// Tested against a live session on a real install.
     Verified,
     /// Written from documentation. May be wrong. The UI says so.
+    /// Constructed as soon as the second adapter lands (M1.0).
+    #[allow(dead_code)]
     Unverified,
 }
 
