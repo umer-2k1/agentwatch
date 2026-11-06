@@ -26,6 +26,26 @@
   --dead: #ff453a;
   --unknown: #8e8e93;
 
+  /* vendor brand colours — the ring around a dot and its chip.
+     Approximations of each vendor's primary mark; corrected in one place only.
+     Status still owns the dot FILL (SPEC-001); brand never encodes state. */
+  --brand-claude:    #d97757;  /* Anthropic clay */
+  --brand-codex:     #10a37f;  /* OpenAI green */
+  --brand-cursor:    #c8c8cc;  /* monochrome mark */
+  --brand-gemini:    #8e75ff;  /* Gemini spark */
+  --brand-copilot:   #8957e5;  /* GitHub Copilot purple */
+  --brand-opencode:  #f5a623;  /* OpenCode amber */
+  --brand-grok:      #e6e6ea;  /* monochrome */
+  --brand-qwen:      #615ced;
+  --brand-kilo:      #7dd3fc;
+  --brand-cline:     #4ade80;
+  --brand-roo:       #a78bfa;
+  --brand-goose:     #22c55e;
+  --brand-droid:     #f472b6;
+  --brand-hermes:    #fbbf24;
+  --brand-pi:        #38bdf8;
+  --brand-default:   rgba(255, 255, 255, 0.28);
+
   --radius: 12px;
   --radius-sm: 9px;
   --gap: 14px;
@@ -88,6 +108,8 @@ body {
 .dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; width: 72px; }
 .dot {
   width: var(--dot); height: var(--dot); border-radius: 50%;
+  /* brand owns the ring, status owns the fill */
+  border: 2px solid var(--brand, var(--brand-default));
   transition: box-shadow .18s ease, transform .18s ease;
 }
 .dot.working  { background: var(--working); box-shadow: 0 0 0 4px color-mix(in srgb, var(--working) 16%, transparent); }
@@ -95,7 +117,7 @@ body {
 .dot.done     { background: var(--done); box-shadow: 0 0 0 4px color-mix(in srgb, var(--done) 14%, transparent); }
 .dot.idle     { background: var(--idle); opacity: .5; }
 .dot.dead     { background: var(--dead); box-shadow: 0 0 0 4px color-mix(in srgb, var(--dead) 18%, transparent); }
-.dot.unknown  { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--unknown) 70%, transparent); }
+.dot.unknown  { background: transparent; border: 2px dashed var(--brand, var(--brand-default)); }
 @keyframes pulse {
   50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--needs-you) 3%, transparent); }
 }
@@ -103,6 +125,33 @@ body {
 .dot-label {
   font-size: 10.5px; color: var(--text-faint); text-align: center;
   max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* vendor modifiers: set --brand for the dot ring and the chip */
+.p-claude   { --brand: var(--brand-claude); }
+.p-codex    { --brand: var(--brand-codex); }
+.p-cursor   { --brand: var(--brand-cursor); }
+.p-gemini   { --brand: var(--brand-gemini); }
+.p-copilot  { --brand: var(--brand-copilot); }
+.p-opencode { --brand: var(--brand-opencode); }
+.p-grok     { --brand: var(--brand-grok); }
+.p-qwen     { --brand: var(--brand-qwen); }
+.p-kilo     { --brand: var(--brand-kilo); }
+.p-cline    { --brand: var(--brand-cline); }
+.p-roo      { --brand: var(--brand-roo); }
+.p-goose    { --brand: var(--brand-goose); }
+.p-droid    { --brand: var(--brand-droid); }
+.p-hermes   { --brand: var(--brand-hermes); }
+.p-pi       { --brand: var(--brand-pi); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 560; color: var(--brand, var(--text-dim));
+  white-space: nowrap;
+}
+.chip::before {
+  content: ""; width: 6px; height: 6px; border-radius: 2px;
+  background: var(--brand, var(--brand-default));
 }
 
 /* ---- list ---- */
