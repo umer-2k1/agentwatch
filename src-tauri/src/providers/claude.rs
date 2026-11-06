@@ -45,12 +45,19 @@ pub struct ClaudeProvider {
 const DISCOVERY_INTERVAL_MS: u128 = 2000;
 
 impl ClaudeProvider {
+    #[allow(dead_code)] // convenience constructor; the store uses with_window()
     pub fn new() -> Self {
+        Self::with_window(test_and_env_window())
+    }
+
+    /// Explicit window, in hours. Used by the live test and by
+    /// `AGENTWATCH_ACTIVE_WINDOW_HOURS` for anyone who wants a longer memory.
+    pub fn with_window(hours: i64) -> Self {
         let root = dirs_claude();
         Self {
             root,
             files: HashMap::new(),
-            active_window_s: 12 * 3600,
+            active_window_s: hours.max(1) * 3600,
             last_discovery: None,
             cached_paths: Vec::new(),
         }
@@ -93,6 +100,7 @@ impl ClaudeProvider {
             Err(_) => return,
         };
         let size = meta.len();
+        let mut buf: Vec<u8>;
 
         let state = self.files.entry(path.to_path_buf()).or_default();
 
@@ -106,7 +114,6 @@ impl ClaudeProvider {
             return;
         }
 
-        let mut buf = Vec::new();
         {
             let Ok(mut f) = fs::File::open(path) else { return };
             if f.seek(SeekFrom::Start(state.offset)).is_err() {
@@ -328,6 +335,15 @@ fn apply_line(fact: &mut SessionFact, v: &Value) {
 
         _ => {}
     }
+}
+
+/// Hours of history the board considers "live". Default 12.
+#[allow(dead_code)]
+fn test_and_env_window() -> i64 {
+    std::env::var("AGENTWATCH_ACTIVE_WINDOW_HOURS")
+        .ok()
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(12)
 }
 
 fn dirs_claude() -> PathBuf {

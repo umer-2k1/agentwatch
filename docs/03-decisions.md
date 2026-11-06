@@ -15,6 +15,8 @@ Append-only. A decision is never edited — if it changes, add a new entry that 
 | D-009 | Process liveness ships in v0.1, not later | active |
 | D-010 | Tauri (Rust + system webview), not Electron | active |
 | D-011 | Append-only span log; derive aggregates, never pre-aggregate | active |
+| D-012 | Only transcripts touched inside an active window are shown (default 12h) | active |
+| D-013 | An open turn with no live process goes `unknown`, never `working` | active |
 
 ---
 
@@ -111,3 +113,30 @@ aggregates at read time.
 
 **Why.** Pre-aggregating into daily buckets (what AgentDock does) makes questions like
 "which weekday do I get interrupted most" permanently unanswerable.
+
+## D-012 — Active window, not all history
+
+**Context.** The first live scan found **246** transcripts, because Claude Code keeps every
+session ever run for a project. Showing 246 dots is not a status board; it also took 11s to
+parse them all on the first tick.
+
+**Decision.** A transcript is a candidate session only if its mtime is inside
+`active_window` (default 12 h, override with `AGENTWATCH_ACTIVE_WINDOW_HOURS`). Directory
+scans are cached for 2 s.
+
+**Consequence.** After the window, a session disappears even if nobody reviewed it. Accepted:
+the board answers "what is happening now", not "what happened in March". History (M0.4)
+will read the same files on demand, so nothing is lost.
+
+## D-013 — `unknown` is a real state
+
+**Context.** The same scan showed months-old abandoned transcripts as `working`, because
+`turnClosed == false` was read as "in progress".
+
+**Decision.** An open turn with no live process and no activity for `staleTurnAfter`
+(default 15 min) resolves to `unknown`, with evidence *"turn never closed, no process,
+quiet for X"*.
+
+**Why.** Two lies are available here: call it `working` (it isn't) or call it `idle` (we
+don't know). Both destroy trust in every other dot. `unknown` is the only answer that stays
+true, and the evidence string tells the user exactly what we saw.

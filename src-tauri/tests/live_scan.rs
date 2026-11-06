@@ -1,40 +1,54 @@
 //! Live verification against this machine's real Claude Code transcripts.
 //!
-//! Ignored by default because it depends on the developer's own session files.
-//! Run with:  cargo test --test live_scan -- --ignored --nocapture
+//! Ignored by default: it depends on the developer's own session files.
+//!   cargo test --test live_scan -- --ignored --nocapture
 //!
-//! What it proves (M0.1 acceptance criteria):
+//! M0.1 acceptance criteria covered:
 //!   1. real transcripts parse without panicking
-//!   2. statuses are produced for real sessions
-//!   3. liveness returns an answer (some pid, or an explicit "unknown")
+//!   2. every parsed session resolves to a status
+//!   3. the whole scan is fast enough to poll
 
-use agentwatch_lib::debug_scan;
+use agentwatch_lib::{debug_scan, debug_scan_with_window};
+use std::time::Instant;
 
 #[test]
 #[ignore]
 fn scans_real_sessions() {
-    let rows = debug_scan();
+    // Default window — may legitimately be empty if nothing ran today.
+    let narrow = debug_scan();
+    println!("\n[12h window] {} live session(s)", narrow.len());
 
-    println!("\n--- AgentWatch live scan ---");
-    println!("{:<28} {:<10} {:<9} {}", "repo", "status", "conf", "age");
-    for r in &rows {
+    // Wide window — proves the parser handles the machine's real history.
+    let t0 = Instant::now();
+    let wide = debug_scan_with_window(24 * 180);
+    let elapsed = t0.elapsed();
+
+    println!("\n--- AgentWatch live scan (180d window) ---");
+    println!("{:<30} {:<10} {:<9} {}", "repo", "status", "conf", "quiet");
+    for r in wide.iter().take(25) {
         println!(
-            "{:<28} {:<10} {:<9} {}",
-            truncate(&r.repo, 28),
+            "{:<30} {:<10} {:<9} {}",
+            truncate(&r.repo, 30),
             r.status,
             r.confidence,
             r.age
         );
     }
-    println!("--- {} sessions ---\n", rows.len());
+    if wide.len() > 25 {
+        println!("... {} more", wide.len() - 25);
+    }
+    println!("--- {} sessions in {:?} ---\n", wide.len(), elapsed);
 
+    assert!(!wide.is_empty(), "no transcripts found at all");
     assert!(
-        !rows.is_empty(),
-        "no sessions found — is ~/.claude/projects populated?"
-    );
-    assert!(
-        rows.iter().all(|r| !r.status.is_empty()),
+        wide.iter().all(|r| !r.status.is_empty()),
         "every session must resolve to a status"
+    );
+    // A status board must never take seconds to look at the past.
+    assert!(
+        elapsed.as_secs() < 20,
+        "scan too slow: {:?}",
+        elapsed
     );
 }
 

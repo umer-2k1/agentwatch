@@ -12,12 +12,17 @@ use crate::model::{Confidence, Evidence, EvidenceKind, Session, SessionFact, Sta
 pub struct Settings {
     /// A finished, quiet session becomes `idle` after this many seconds.
     pub idle_after_s: i64,
+    /// An *open* turn with no live process stops being "working" after this long and
+    /// becomes `unknown`. Without this rule a transcript abandoned three months ago
+    /// claims to be mid-task forever — the most common way status boards lie.
+    pub stale_turn_after_s: i64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             idle_after_s: 15 * 60,
+            stale_turn_after_s: 15 * 60,
         }
     }
 }
@@ -51,6 +56,24 @@ pub fn resolve(
                     Some(pid) => format!("pid {} is gone", pid),
                     None => "process is gone".into(),
                 },
+            },
+        )
+    } else if (fact.pending_tool.is_some() || !fact.turn_closed)
+        && live.alive != Some(true)
+        && quiet_for_s >= settings.stale_turn_after_s
+    {
+        // Rule 3a — the honesty rule. An open turn, no live process, and quiet for a long
+        // time. Could be crashed, Ctrl-C'd, or the terminal was closed. We cannot tell, so
+        // we say so instead of showing a blue dot forever.
+        (
+            Status::Unknown,
+            Confidence::Unknown,
+            Evidence {
+                kind: EvidenceKind::Process,
+                detail: format!(
+                    "turn never closed, no process, quiet for {}m",
+                    quiet_for_s / 60
+                ),
             },
         )
     } else if fact.pending_tool.is_some() {
@@ -197,6 +220,37 @@ mod tests {
             Settings::default(),
         );
         assert_ne!(s.confidence, Confidence::Certain);
+    }
+
+    #[test]
+    fn abandoned_turn_without_process_is_unknown_not_working() {
+        let mut f = fact();
+        f.turn_closed = false;
+        f.pending_tool = Some("Bash".into());
+        // Quiet for three days, no process found.
+        let s = resolve(
+            &f,
+            &alive(None),
+            NOW + 3 * 24 * 60 * 60 * 1000,
+            Settings::default(),
+        );
+        assert_eq!(s.status, Status::Unknown);
+        assert_eq!(s.confidence, Confidence::Unknown);
+    }
+
+    #[test]
+    fn long_tool_call_with_live_process_stays_working() {
+        let mut f = fact();
+        f.turn_closed = false;
+        f.pending_tool = Some("Bash".into());
+        // 40 minutes into a long command, but the process is alive.
+        let s = resolve(
+            &f,
+            &alive(Some(true)),
+            NOW + 40 * 60 * 1000,
+            Settings::default(),
+        );
+        assert_eq!(s.status, Status::Working);
     }
 
     #[test]

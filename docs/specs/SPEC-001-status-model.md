@@ -38,13 +38,27 @@ wins, because a hook is a fact and a file is a trace.
 Evaluated per session, in this order. First match wins.
 
 ```
-1. if !alive                                    -> dead
-2. if hookWaiting                               -> needsYou
-3. if pendingTool                               -> working
-4. if !turnClosed                               -> working   (model thinking)
-5. if quietFor < idleAfter                      -> done
-6. else                                         -> idle
+1.  if !readable                                        -> unknown
+2.  if !alive                                           -> dead
+3.  if open turn AND !alive AND quiet >= staleTurnAfter  -> unknown   <-- rule 3a
+4.  if hookWaiting                                      -> needsYou
+5.  if pendingTool                                      -> working
+6.  if !turnClosed                                      -> working  (model thinking)
+7.  if quietFor < idleAfter                             -> done
+8.  else                                                -> idle
 ```
+
+### Rule 3a — the honesty rule  *(added 2026-11-06, after a live scan bug)*
+
+Every transcript on the author's machine that ended mid-turn — some three months old —
+reported `working`, because "the turn never closed" was treated as "currently running".
+That is the exact lie this spec exists to prevent.
+
+An open turn becomes `unknown` once all of these hold: no live process, and quiet longer
+than `staleTurnAfter` (default 15 min). It is not `idle` (we don't know that it is fine) and
+it is not `working` (nothing is running it). It is honestly unknown.
+
+A *live* process overrides this: a 40-minute `npm test` with the agent alive stays `working`.
 
 Notes:
 - Rule 1 before everything: a dead agent is dead regardless of what the file says.
@@ -86,3 +100,5 @@ or pid. The UI's "why?" popover shows it. This is how a user disputes a wrong do
 - [ ] A half-written JSON line never crashes the reader and never changes status
 - [ ] A subagent finishing does not mark its parent `done`
 - [ ] Unreadable transcript renders `unknown`, not `idle`
+- [ ] An abandoned turn (no process, quiet > 15 min) renders `unknown`, **not** `working`
+- [ ] A long tool call with a live process stays `working`

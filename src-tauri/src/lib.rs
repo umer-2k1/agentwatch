@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 use store::{ProviderInfo, SharedStore, Store};
 
@@ -70,7 +70,7 @@ pub fn run() {
         .expect("error while running AgentWatch");
 }
 
-/// Debug helper for the live integration test. Prints nothing secret: repo, status,
+/// Debug helpers for the live integration test. Print nothing secret: repo, status,
 /// confidence and age only. Not used by the app itself.
 pub struct DebugRow {
     pub repo: String,
@@ -79,20 +79,28 @@ pub struct DebugRow {
     pub age: String,
 }
 
+/// Scan with the app's default window (12h).
 pub fn debug_scan() -> Vec<DebugRow> {
-    let mut store = Store::new();
+    debug_scan_with_window(12)
+}
+
+/// Scan with an explicit window in hours. The live test uses a wide window because a
+/// machine with nothing running right now legitimately has zero sessions inside 12h.
+pub fn debug_scan_with_window(hours: i64) -> Vec<DebugRow> {
+    let mut store = Store::with_window(hours);
     let snapshot = store.tick().to_vec();
-    snapshot
-        .into_iter()
-        .map(|s| DebugRow {
-            repo: if s.fact.repo.is_empty() {
-                "-".into()
-            } else {
-                s.fact.repo.clone()
-            },
-            status: s.status.as_str().to_string(),
-            confidence: format!("{:?}", s.confidence).to_lowercase(),
-            age: format!("{}s", s.quiet_for_s),
-        })
-        .collect()
+    snapshot.into_iter().map(row_of).collect()
+}
+
+fn row_of(s: model::Session) -> DebugRow {
+    DebugRow {
+        repo: if s.fact.repo.is_empty() {
+            "-".into()
+        } else {
+            s.fact.repo.clone()
+        },
+        status: s.status.as_str().to_string(),
+        confidence: format!("{:?}", s.confidence).to_lowercase(),
+        age: format!("{}s", s.quiet_for_s),
+    }
 }
