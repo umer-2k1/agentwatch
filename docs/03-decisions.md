@@ -17,6 +17,7 @@ Append-only. A decision is never edited — if it changes, add a new entry that 
 | D-011 | Append-only span log; derive aggregates, never pre-aggregate | active |
 | D-012 | Only transcripts touched inside an active window are shown (default 12h) | active |
 | D-013 | An open turn with no live process goes `unknown`, never `working` | active |
+| D-014 | Dot fill = status, dot ring + chip = vendor brand colour | active |
 
 ---
 
@@ -140,3 +141,30 @@ quiet for X"*.
 **Why.** Two lies are available here: call it `working` (it isn't) or call it `idle` (we
 don't know). Both destroy trust in every other dot. `unknown` is the only answer that stays
 true, and the evidence string tells the user exactly what we saw.
+
+## D-014 — Two colour channels: status and brand
+
+**Context.** With several vendors on the board, colour is contested. Status needs it
+(SPEC-001 depends on it) and users also want to recognise Claude vs Codex vs Cursor
+instantly. One channel cannot carry both.
+
+**Decision.** Split the channels.
+
+| Channel | Encodes | Where |
+|---|---|---|
+| **Fill** | status (blue / amber / green / grey / red) | dot body, row marker |
+| **Ring + chip** | vendor brand colour | 2 px ring, label chip, brand tick |
+
+**Why this order.** Status is the product; vendor is context. If brand ever owned the fill,
+a green dot would mean "Codex" instead of "done" and the whole board would become
+unreadable. AgentDock reaches the same conclusion in reverse — their provider-icon setting
+puts the *logo* inside the dot and keeps the colour for status.
+
+**Brand colours** live in `:root` in `styles.css` (`--brand-claude: #d97757`,
+`--brand-codex: #10a37f`, `--brand-gemini: #8e75ff`, …). They are approximations of each
+vendor's primary mark, corrected in exactly one place. `--brand-default` covers any agent
+we do not have a colour for, so a new adapter never renders invisible.
+
+**Accessibility note.** Status is never conveyed by fill alone: every row also carries a
+text pill (`needs you`, `dead`, `unknown ?`), so the board survives colour blindness and
+greyscale.

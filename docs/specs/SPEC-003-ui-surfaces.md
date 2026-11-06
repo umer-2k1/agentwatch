@@ -29,6 +29,16 @@ Borderless, always-on-top, **non-activating** window pinned to a screen edge. Mu
 steal focus. Click-through where there is nothing to click. This is the surface the product
 is named for; the board is the place you go when a dot needs explaining.
 
+## Colour channels  (D-014)
+
+| Channel | Encodes | Rule |
+|---|---|---|
+| dot fill | **status** | never used for anything else |
+| dot ring, chip, brand tick | **vendor** | `--brand-*` tokens, one per agent |
+| dashed hollow ring | **unknown** | must not read as a solid `idle` dot |
+
+Status must also be legible without colour: every row carries a text pill.
+
 ## Theming readiness
 
 Every colour, radius, gap and dot size is a CSS custom property in `:root`. M0.3 swaps that
