@@ -115,7 +115,9 @@ impl ClaudeProvider {
         }
 
         {
-            let Ok(mut f) = fs::File::open(path) else { return };
+            let Ok(mut f) = fs::File::open(path) else {
+                return;
+            };
             if f.seek(SeekFrom::Start(state.offset)).is_err() {
                 return;
             }
@@ -154,12 +156,7 @@ impl ClaudeProvider {
         }
         state.fact.provider = "claude-code".into();
         if state.fact.title.is_empty() {
-            state.fact.title = state
-                .fact
-                .repo
-                .clone()
-                .replace('_', " ")
-                .replace('-', " ");
+            state.fact.title = state.fact.repo.clone().replace('_', " ").replace('-', " ");
         }
         if state.fact.title.is_empty() {
             state.fact.title = "Claude Code".into();
@@ -238,7 +235,10 @@ fn apply_line(fact: &mut SessionFact, v: &Value) {
     }
 
     // Subagents update liveness but never status (SPEC-001).
-    let side = v.get("isSidechain").and_then(|s| s.as_bool()).unwrap_or(false);
+    let side = v
+        .get("isSidechain")
+        .and_then(|s| s.as_bool())
+        .unwrap_or(false);
     if side {
         fact.is_sidechain = false; // the file itself is the parent session
         return;
@@ -378,7 +378,9 @@ mod tests {
         let mut f = SessionFact::default();
         apply_line(
             &mut f,
-            &line(r#"{"type":"assistant","gitBranch":"main","cwd":"/x/app","timestamp":"2026-11-06T10:00:00Z","slug":"fix-login","message":{"model":"claude-opus-5","stop_reason":"end_turn","content":[{"type":"text","text":"done"}]}}"#),
+            &line(
+                r#"{"type":"assistant","gitBranch":"main","cwd":"/x/app","timestamp":"2026-11-06T10:00:00Z","slug":"fix-login","message":{"model":"claude-opus-5","stop_reason":"end_turn","content":[{"type":"text","text":"done"}]}}"#,
+            ),
         );
         assert!(f.turn_closed);
         assert!(f.pending_tool.is_none());
@@ -392,7 +394,9 @@ mod tests {
         let mut f = SessionFact::default();
         apply_line(
             &mut f,
-            &line(r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1","name":"Bash"}]}}"#),
+            &line(
+                r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1","name":"Bash"}]}}"#,
+            ),
         );
         assert!(!f.turn_closed);
         assert_eq!(f.pending_tool.as_deref(), Some("t1"));
@@ -403,11 +407,15 @@ mod tests {
         let mut f = SessionFact::default();
         apply_line(
             &mut f,
-            &line(r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1"}]}}"#),
+            &line(
+                r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1"}]}}"#,
+            ),
         );
         apply_line(
             &mut f,
-            &line(r#"{"type":"user","timestamp":"2026-11-06T10:00:05Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1"}]}}"#),
+            &line(
+                r#"{"type":"user","timestamp":"2026-11-06T10:00:05Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1"}]}}"#,
+            ),
         );
         assert!(f.pending_tool.is_none());
         assert!(!f.turn_closed);
@@ -416,7 +424,10 @@ mod tests {
     #[test]
     fn unknown_line_types_are_ignored() {
         let mut f = SessionFact::default();
-        apply_line(&mut f, &line(r#"{"type":"api-request-blob","sessionId":"s"}"#));
+        apply_line(
+            &mut f,
+            &line(r#"{"type":"api-request-blob","sessionId":"s"}"#),
+        );
         apply_line(&mut f, &line(r#"{"type":"mode","mode":"plan"}"#));
         assert!(f.id.is_empty() || f.id.starts_with("claude-code:"));
     }

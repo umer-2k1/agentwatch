@@ -133,9 +133,7 @@ pub fn resolve(
         evidence,
         pid: live.pid,
         quiet_for_s,
-        turn_age_s: fact
-            .turn_started_ms
-            .map(|t| ((now_ms - t).max(0)) / 1000),
+        turn_age_s: fact.turn_started_ms.map(|t| ((now_ms - t).max(0)) / 1000),
     }
 }
 
@@ -157,7 +155,10 @@ mod tests {
     }
 
     fn alive(v: Option<bool>) -> LivenessAnswer {
-        LivenessAnswer { alive: v, pid: Some(42) }
+        LivenessAnswer {
+            alive: v,
+            pid: Some(42),
+        }
     }
 
     const NOW: i64 = 1_000_000;
@@ -182,7 +183,12 @@ mod tests {
 
     #[test]
     fn just_finished_is_done() {
-        let s = resolve(&fact(), &alive(Some(true)), NOW + 5_000, Settings::default());
+        let s = resolve(
+            &fact(),
+            &alive(Some(true)),
+            NOW + 5_000,
+            Settings::default(),
+        );
         assert_eq!(s.status, Status::Done);
     }
 
@@ -201,12 +207,7 @@ mod tests {
     fn unreadable_is_unknown_not_idle() {
         let mut f = fact();
         f.readable = false;
-        let s = resolve(
-            &f,
-            &alive(None),
-            NOW + 60 * 60 * 1000,
-            Settings::default(),
-        );
+        let s = resolve(&f, &alive(None), NOW + 60 * 60 * 1000, Settings::default());
         assert_eq!(s.status, Status::Unknown);
         assert_eq!(s.confidence, Confidence::Unknown);
     }
