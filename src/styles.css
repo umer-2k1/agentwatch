@@ -49,7 +49,7 @@
   --radius: 12px;
   --radius-sm: 9px;
   --gap: 14px;
-  --dot: 13px;
+  --dot: 16px;
   --blur: 24px;
 }
 
@@ -108,8 +108,9 @@ body {
 .dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; width: 72px; }
 .dot {
   width: var(--dot); height: var(--dot); border-radius: 50%;
-  /* brand owns the ring, status owns the fill */
+  /* brand owns the ring, status owns the fill (D-014) */
   border: 2px solid var(--brand, var(--brand-default));
+  background-clip: padding-box;
   transition: box-shadow .18s ease, transform .18s ease;
 }
 .dot.working  { background: var(--working); box-shadow: 0 0 0 4px color-mix(in srgb, var(--working) 16%, transparent); }
@@ -117,7 +118,15 @@ body {
 .dot.done     { background: var(--done); box-shadow: 0 0 0 4px color-mix(in srgb, var(--done) 14%, transparent); }
 .dot.idle     { background: var(--idle); opacity: .5; }
 .dot.dead     { background: var(--dead); box-shadow: 0 0 0 4px color-mix(in srgb, var(--dead) 18%, transparent); }
-.dot.unknown  { background: transparent; border: 2px dashed var(--brand, var(--brand-default)); }
+.dot.unknown  {
+  background: transparent;
+  border: 2px dashed color-mix(in srgb, var(--brand, var(--brand-default)) 85%, transparent);
+  position: relative;
+}
+.dot.unknown::after {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: color-mix(in srgb, var(--unknown) 55%, transparent);
+}
 @keyframes pulse {
   50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--needs-you) 3%, transparent); }
 }
@@ -170,7 +179,10 @@ body {
   border-color: var(--line);
   backdrop-filter: blur(var(--blur));
 }
-.row .mini { width: 7px; height: 7px; border-radius: 50%; }
+.row .mini {
+  width: 9px; height: 9px; border-radius: 50%;
+  border-width: 1.5px;
+}
 .row .title { font-weight: 570; font-size: 13px; }
 .row .meta {
   color: var(--text-faint); font-size: 11.5px; margin-top: 2px;
