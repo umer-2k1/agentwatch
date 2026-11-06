@@ -69,3 +69,30 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running AgentWatch");
 }
+
+/// Debug helper for the live integration test. Prints nothing secret: repo, status,
+/// confidence and age only. Not used by the app itself.
+pub struct DebugRow {
+    pub repo: String,
+    pub status: String,
+    pub confidence: String,
+    pub age: String,
+}
+
+pub fn debug_scan() -> Vec<DebugRow> {
+    let mut store = Store::new();
+    let snapshot = store.tick().to_vec();
+    snapshot
+        .into_iter()
+        .map(|s| DebugRow {
+            repo: if s.fact.repo.is_empty() {
+                "-".into()
+            } else {
+                s.fact.repo.clone()
+            },
+            status: s.status.as_str().to_string(),
+            confidence: format!("{:?}", s.confidence).to_lowercase(),
+            age: format!("{}s", s.quiet_for_s),
+        })
+        .collect()
+}
