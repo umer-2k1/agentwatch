@@ -45,11 +45,7 @@ fn scans_real_sessions() {
         "every session must resolve to a status"
     );
     // A status board must never take seconds to look at the past.
-    assert!(
-        elapsed.as_secs() < 20,
-        "scan too slow: {:?}",
-        elapsed
-    );
+    assert!(elapsed.as_secs() < 20, "scan too slow: {:?}", elapsed);
 }
 
 fn truncate(s: &str, n: usize) -> String {

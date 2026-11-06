@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The resolver is pure and the providers are fixture-tested, so the whole suite runs
+      # without any agent installed. The live scan test is #[ignore]d on purpose.
+      - name: Unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Docs present
+        run: |
+          test -f docs/HANDOFF.md
+          test -f docs/03-decisions.md
+          echo "docs spine intact"
