@@ -16,6 +16,30 @@ const el = {
 
 const ORDER = ["needsYou", "dead", "working", "done", "idle", "unknown"];
 
+// Provider → presentation. Brand colour lives in styles.css as --brand-*; this map only
+// decides which modifier class to apply, so a new agent needs no JS change beyond one line.
+const PROVIDERS = {
+  "claude-code": { short: "claude", label: "Claude Code" },
+  codex: { short: "codex", label: "Codex" },
+  cursor: { short: "cursor", label: "Cursor" },
+  "gemini-cli": { short: "gemini", label: "Gemini CLI" },
+  "copilot-cli": { short: "copilot", label: "Copilot" },
+  opencode: { short: "opencode", label: "OpenCode" },
+  grok: { short: "grok", label: "Grok" },
+  "qwen-code": { short: "qwen", label: "Qwen" },
+  "kilo-code": { short: "kilo", label: "Kilo" },
+  cline: { short: "cline", label: "Cline" },
+  roo: { short: "roo", label: "Roo" },
+  goose: { short: "goose", label: "Goose" },
+  droid: { short: "droid", label: "Droid" },
+  hermes: { short: "hermes", label: "Hermes" },
+  pi: { short: "pi", label: "Pi" },
+};
+
+function providerOf(s) {
+  return PROVIDERS[s.provider] || { short: "", label: s.provider || "Agent" };
+}
+
 let latest = [];
 
 function label(s) {
@@ -55,9 +79,10 @@ function render(sessions) {
   for (const s of sessions) {
     const wrap = document.createElement("div");
     wrap.className = "dot-wrap";
-    wrap.title = `${label(s)} — ${pretty(s.status)}${s.confidence !== "certain" ? ` (${s.confidence})` : ""}\n${s.evidence?.detail || ""}`;
+    const prov = providerOf(s);
+    wrap.title = `${label(s)} — ${pretty(s.status)} · ${prov.label}${s.confidence !== "certain" ? ` (${s.confidence})` : ""}\n${s.evidence?.detail || ""}`;
     wrap.innerHTML = `
-      <span class="dot ${s.status}" aria-label="${pretty(s.status)}"></span>
+      <span class="dot ${s.status} p-${prov.short}" aria-label="${pretty(s.status)}, ${prov.label}"></span>
       <span class="dot-label">${escapeHtml(label(s))}</span>`;
     el.strip.appendChild(wrap);
   }
@@ -77,11 +102,13 @@ function render(sessions) {
     const row = document.createElement("div");
     row.className = "row";
     row.title = s.evidence?.detail || "";
+    const prov = providerOf(s);
     row.innerHTML = `
-      <span class="mini dot ${s.status}" style="width:8px;height:8px;box-shadow:none"></span>
+      <span class="mini dot ${s.status} p-${prov.short}" style="width:7px;height:7px;box-shadow:none"></span>
       <div>
         <div class="title">${escapeHtml(label(s))}</div>
         <div class="meta">
+          <span class="chip p-${prov.short}">${escapeHtml(prov.label)}</span>
           <span>${escapeHtml(subtitle(s))}</span>
           <span>${quiet(s)}</span>
           ${s.pid ? `<span>pid ${s.pid}</span>` : ""}
