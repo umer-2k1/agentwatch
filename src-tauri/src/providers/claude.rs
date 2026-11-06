@@ -32,7 +32,17 @@ struct FileState {
 pub struct ClaudeProvider {
     root: PathBuf,
     files: HashMap<PathBuf, FileState>,
+    /// Only files touched inside this window are considered live sessions. Without this we
+    /// find every transcript ever written (246 on the author's machine) and try to show
+    /// them all, which is both wrong and slow.
+    active_window_s: i64,
+    last_discovery: Option<std::time::Instant>,
+    cached_paths: Vec<PathBuf>,
 }
+
+/// Directory scan cadence. Read-dirs are cheap but not free; sessions do not appear
+/// more often than this.
+const DISCOVERY_INTERVAL_MS: u128 = 2000;
 
 impl ClaudeProvider {
     pub fn new() -> Self {
@@ -40,6 +50,9 @@ impl ClaudeProvider {
         Self {
             root,
             files: HashMap::new(),
+            active_window_s: 12 * 3600,
+            last_discovery: None,
+            cached_paths: Vec::new(),
         }
     }
 
@@ -57,10 +70,16 @@ impl ClaudeProvider {
             let Ok(files) = fs::read_dir(entry.path()) else {
                 continue;
             };
+            let cutoff = std::time::SystemTime::now()
+                - std::time::Duration::from_secs(self.active_window_s.max(60) as u64);
             for f in files.flatten() {
                 let p = f.path();
-                if p.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                    out.push(p);
+                if p.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                match f.metadata().and_then(|m| m.modified()) {
+                    Ok(m) if m >= cutoff => out.push(p),
+                    _ => {}
                 }
             }
         }
@@ -156,13 +175,20 @@ impl Provider for ClaudeProvider {
     }
 
     fn poll(&mut self, _now_ms: i64) -> Vec<SessionFact> {
-        let paths = self.discover();
+        let stale = match self.last_discovery {
+            None => true,
+            Some(t) => t.elapsed().as_millis() >= DISCOVERY_INTERVAL_MS,
+        };
+        if stale {
+            self.last_discovery = Some(std::time::Instant::now());
+            self.cached_paths = self.discover();
+        }
 
         // Drop sessions whose file disappeared (closed tab, cleaned up).
         self.files.retain(|p, _| p.exists());
 
-        for p in &paths {
-            self.advance(p);
+        for p in self.cached_paths.clone() {
+            self.advance(&p);
         }
 
         self.files
