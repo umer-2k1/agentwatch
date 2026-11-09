@@ -260,12 +260,12 @@ html[data-theme="light"] {
 
 /* ---------- settings drawer ---------- */
 .gear {
+  display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--text-dim);
   border-radius: 8px;
-  width: 26px; height: 24px;
-  font-size: 13px; line-height: 1;
+  width: 27px; height: 25px;
   cursor: pointer;
   margin-left: 14px;
 }
