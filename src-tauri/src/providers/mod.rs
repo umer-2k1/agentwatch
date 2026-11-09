@@ -9,6 +9,7 @@
 //! gives us a seam to test each format against a recorded fixture.
 
 pub mod claude;
+pub mod opencode;
 
 use crate::model::SessionFact;
 

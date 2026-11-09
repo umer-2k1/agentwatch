@@ -6,7 +6,7 @@
 pub mod hooks;
 mod liveness;
 pub mod model;
-mod providers;
+pub mod providers;
 mod resolver;
 pub mod store;
 
