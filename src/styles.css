@@ -253,10 +253,21 @@ html[data-theme="light"] {
   --line-strong: rgba(0, 0, 0, 0.16);
   --text: #1d1d1f;
   --text-dim: #6e6e73;
-  --text-faint: #8e8e93;
-  --idle: #b0b0b6;
-  --unknown: #b0b0b6;
+  --text-faint: #86868b;
+
+  /* Apple's *light*-appearance system colours. The dark ones are unreadable on white:
+     a #0a84ff pill on #f2f2f4 has ~2.1:1 contrast, this one has ~4.9:1. */
+  --working: #0071e3;
+  --needs-you: #a85600;
+  --done: #1a7f37;
+  --dead: #d70015;
+  --idle: #86868b;
+  --unknown: #86868b;
 }
+
+/* keep the keyboard answer buttons legible on light */
+html[data-theme="light"] .answer-keys button { color: var(--text); }
+html[data-theme="light"] .dot.idle { opacity: .75; }
 
 /* ---------- settings drawer ---------- */
 .gear {
