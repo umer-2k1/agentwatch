@@ -18,6 +18,7 @@ Append-only. A decision is never edited — if it changes, add a new entry that 
 | D-012 | Only transcripts touched inside an active window are shown (default 12h) | active |
 | D-013 | An open turn with no live process goes `unknown`, never `working` | active |
 | D-014 | Dot fill = status, dot ring + chip = vendor brand colour | active |
+| D-015 | Remember the last observed pid per session; never infer death from absence | active |
 
 ---
 
@@ -168,3 +169,36 @@ we do not have a colour for, so a new adapter never renders invisible.
 **Accessibility note.** Status is never conveyed by fill alone: every row also carries a
 text pill (`needs you`, `dead`, `unknown ?`), so the board survives colour blindness and
 greyscale.
+
+## D-015 — Sticky pid memory is what makes `dead` reachable
+
+**Context.** The first working liveness pass still could not report death. The scan answers
+"which pid owns this cwd *right now*", and when an agent exits its entry simply disappears
+— which is indistinguishable from an agent running somewhere we cannot see (a GUI app, a
+container). Absence of evidence was being treated as evidence.
+
+**Decision.** Keep two maps:
+
+| Map | Meaning |
+|---|---|
+| `by_cwd` | pid claiming this directory *as of the last scan* |
+| `known` | the last pid we **ever positively saw** for this directory |
+
+Resolution: if `by_cwd` has it, that pid is authoritative. Otherwise, if `known` has it,
+test **that** pid with `kill(pid, 0)`. Only that second path can ever produce `dead`.
+
+**Why it matters.** Without this, `dead` is unreachable code — the differentiator would
+exist in the enum and never in reality.
+
+**Cost / risk.** A pid can be reused. Mitigation today: `by_cwd` always wins, so a new
+process re-binds immediately. Proper fix (record process start time alongside the pid) is
+deferred to M0.2, where the hook gives us the pid directly.
+
+## D-016 — Liveness tests use a symlink, not a copy
+
+**Context.** The end-to-end test spawns a stand-in process named `claude`. A copy of
+`/bin/sleep` to that name dies instantly: copying invalidates the code signature and macOS
+SIGKILLs it (`poll()` returns `-9`). The test then "passed" for the wrong reason.
+
+**Decision.** Symlink `/bin/sleep` instead. The original signature is preserved, and `ps`
+still reports the path as `…/claude`, which is what the scanner matches.
