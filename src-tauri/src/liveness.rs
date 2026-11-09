@@ -21,8 +21,16 @@ const CACHE_MS: u128 = 2000;
 #[derive(Default)]
 pub struct Liveness {
     last_scan: Option<Instant>,
-    /// cwd -> pid of a matching agent process.
+    /// cwd -> pid of a matching agent process, as of the last scan.
     by_cwd: HashMap<String, i32>,
+    /// cwd -> the last pid we ever positively saw for it.
+    ///
+    /// This is the whole trick behind `dead`. When an agent exits, its entry disappears
+    /// from the process table, so a pure "scan and match" can only ever answer "not found"
+    /// — which is indistinguishable from "runs in a GUI app we cannot see". By remembering
+    /// the pid we *did* see, we can check that specific pid and learn, positively, that it
+    /// is gone. Without this, `dead` is unreachable.
+    known: HashMap<String, i32>,
 }
 
 pub struct LivenessAnswer {
@@ -62,26 +70,33 @@ impl Liveness {
         }
         self.refresh_if_stale();
         let key = canonical(cwd);
-        match self.by_cwd.get(&key) {
-            Some(pid) => {
-                if Self::pid_is_alive(*pid) {
-                    LivenessAnswer {
-                        alive: Some(true),
-                        pid: Some(*pid),
-                    }
-                } else {
-                    LivenessAnswer {
-                        alive: Some(false),
-                        pid: Some(*pid),
-                    }
-                }
+
+        // 1. A live process currently claims this cwd.
+        if let Some(pid) = self.by_cwd.get(&key) {
+            let alive = Self::pid_is_alive(*pid);
+            if alive {
+                self.known.insert(key, *pid);
             }
-            // No agent process claims this cwd. Could be finished, crashed, or simply
-            // running somewhere we cannot see (a GUI app). Report unknown, not dead.
-            None => LivenessAnswer {
-                alive: None,
-                pid: None,
-            },
+            return LivenessAnswer {
+                alive: Some(alive),
+                pid: Some(*pid),
+            };
+        }
+
+        // 2. Nothing claims it now, but we saw a pid before: check that pid directly.
+        //    This is the only path that can produce `dead`.
+        if let Some(pid) = self.known.get(&key) {
+            let alive = Self::pid_is_alive(*pid);
+            return LivenessAnswer {
+                alive: Some(alive),
+                pid: Some(*pid),
+            };
+        }
+
+        // 3. Never seen. Could be finished, or a GUI app we cannot read. Unknown, not dead.
+        LivenessAnswer {
+            alive: None,
+            pid: None,
         }
     }
 
@@ -202,6 +217,21 @@ mod tests {
     fn canonical_makes_tmp_paths_equal() {
         // /tmp and /private/tmp are the same directory on macOS.
         assert_eq!(canonical("/tmp"), canonical("/private/tmp"));
+    }
+
+    #[test]
+    fn a_pid_we_saw_alive_that_dies_reports_dead() {
+        let mut l = Liveness::new();
+        let key = canonical("/tmp");
+
+        // Pretend we saw a live process in /tmp, then it vanished.
+        l.known.insert(key.clone(), std::process::id() as i32);
+        let a = l.check_cwd("/tmp");
+        assert_eq!(a.alive, Some(true), "our own pid is alive");
+
+        l.known.insert(key, 2_000_000_000); // never existed
+        let b = l.check_cwd("/tmp");
+        assert_eq!(b.alive, Some(false), "a remembered pid that is gone means dead");
     }
 
     #[test]
