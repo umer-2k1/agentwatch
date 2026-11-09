@@ -28,9 +28,12 @@ impl Default for Settings {
 }
 
 /// Resolve one session. Order matters — first match wins. See SPEC-001.
+/// `hook_waiting` is `Some` when a hook told us the agent is blocked. It outranks every
+/// file-derived signal, because a hook is a fact and a transcript is a trace (SPEC-001).
 pub fn resolve(
     fact: &SessionFact,
     live: &LivenessAnswer,
+    hook_waiting: Option<&str>,
     now_ms: i64,
     settings: Settings,
 ) -> Session {
@@ -56,6 +59,17 @@ pub fn resolve(
                     Some(pid) => format!("pid {} is gone", pid),
                     None => "process is gone".into(),
                 },
+            },
+        )
+    } else if let Some(detail) = hook_waiting {
+        // Rule 3 — the only signal a transcript can never produce. `certain`, because the
+        // agent itself said so.
+        (
+            Status::NeedsYou,
+            Confidence::Certain,
+            Evidence {
+                kind: EvidenceKind::Hook,
+                detail: detail.to_string(),
             },
         )
     } else if (fact.pending_tool.is_some() || !fact.turn_closed)
@@ -167,7 +181,7 @@ mod tests {
     fn dead_beats_everything() {
         let mut f = fact();
         f.pending_tool = Some("t1".into());
-        let s = resolve(&f, &alive(Some(false)), NOW, Settings::default());
+        let s = resolve(&f, &alive(Some(false)), None, NOW, Settings::default());
         assert_eq!(s.status, Status::Dead);
         assert_eq!(s.confidence, Confidence::Certain);
     }
@@ -177,7 +191,7 @@ mod tests {
         let mut f = fact();
         f.turn_closed = false;
         f.pending_tool = Some("npm test".into());
-        let s = resolve(&f, &alive(Some(true)), NOW, Settings::default());
+        let s = resolve(&f, &alive(Some(true)), None, NOW, Settings::default());
         assert_eq!(s.status, Status::Working);
     }
 
@@ -186,6 +200,7 @@ mod tests {
         let s = resolve(
             &fact(),
             &alive(Some(true)),
+            None,
             NOW + 5_000,
             Settings::default(),
         );
@@ -197,6 +212,7 @@ mod tests {
         let s = resolve(
             &fact(),
             &alive(Some(true)),
+            None,
             NOW + 16 * 60 * 1000,
             Settings::default(),
         );
@@ -207,17 +223,14 @@ mod tests {
     fn unreadable_is_unknown_not_idle() {
         let mut f = fact();
         f.readable = false;
-        let s = resolve(&f, &alive(None), NOW + 60 * 60 * 1000, Settings::default());
+        let s = resolve(&f, &alive(None), None, NOW + 60 * 60 * 1000, Settings::default());
         assert_eq!(s.status, Status::Unknown);
         assert_eq!(s.confidence, Confidence::Unknown);
     }
 
     #[test]
     fn no_liveness_data_is_never_certain() {
-        let s = resolve(
-            &fact(),
-            &alive(None),
-            NOW + 60 * 60 * 1000,
+        let s = resolve(&fact(), &alive(None), None, NOW + 60 * 60 * 1000,
             Settings::default(),
         );
         assert_ne!(s.confidence, Confidence::Certain);
@@ -229,10 +242,7 @@ mod tests {
         f.turn_closed = false;
         f.pending_tool = Some("Bash".into());
         // Quiet for three days, no process found.
-        let s = resolve(
-            &f,
-            &alive(None),
-            NOW + 3 * 24 * 60 * 60 * 1000,
+        let s = resolve(&f, &alive(None), None, NOW + 3 * 24 * 60 * 60 * 1000,
             Settings::default(),
         );
         assert_eq!(s.status, Status::Unknown);
@@ -248,10 +258,37 @@ mod tests {
         let s = resolve(
             &f,
             &alive(Some(true)),
+            None,
             NOW + 40 * 60 * 1000,
             Settings::default(),
         );
         assert_eq!(s.status, Status::Working);
+    }
+
+    #[test]
+    fn hook_waiting_beats_file_inference() {
+        let s = resolve(
+            &fact(),
+            &alive(Some(true)),
+            Some("permission: run npm test"),
+            NOW,
+            Settings::default(),
+        );
+        assert_eq!(s.status, Status::NeedsYou);
+        assert_eq!(s.confidence, Confidence::Certain);
+        assert!(s.evidence.detail.contains("permission"));
+    }
+
+    #[test]
+    fn hook_waiting_does_not_beat_death() {
+        let s = resolve(
+            &fact(),
+            &alive(Some(false)),
+            Some("permission: run npm test"),
+            NOW,
+            Settings::default(),
+        );
+        assert_eq!(s.status, Status::Dead, "a dead agent is not waiting on you");
     }
 
     #[test]

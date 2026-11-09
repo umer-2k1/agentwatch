@@ -63,7 +63,7 @@ impl Store {
         for p in self.providers.iter_mut() {
             for fact in p.poll(now) {
                 let live = self.liveness.check_cwd(&fact.cwd);
-                out.push(resolve(&fact, &live, now, self.settings));
+                out.push(resolve(&fact, &live, None, now, self.settings));
             }
         }
 
