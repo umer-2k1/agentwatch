@@ -71,7 +71,9 @@ mod tests {
 
     #[test]
     fn notification_is_a_blocker() {
-        let e = ev(r#"{"event":"Notification","session_id":"abc","message":"Claude needs your permission to use Bash"}"#);
+        let e = ev(
+            r#"{"event":"Notification","session_id":"abc","message":"Claude needs your permission to use Bash"}"#,
+        );
         assert!(e.is_waiting());
         assert_eq!(e.key().as_deref(), Some("claude-code:abc"));
         assert!(e.detail().contains("permission"));

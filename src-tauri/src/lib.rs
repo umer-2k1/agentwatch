@@ -38,8 +38,7 @@ fn get_providers(store: tauri::State<SharedStore>) -> Vec<ProviderInfo> {
 /// Where AgentWatch keeps its own state: socket, spans, config.
 fn data_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home)
-        .join("Library/Application Support/AgentWatch")
+    PathBuf::from(home).join("Library/Application Support/AgentWatch")
 }
 
 fn claude_settings_path() -> PathBuf {
@@ -66,7 +65,11 @@ fn hooks_status() -> HooksStatus {
         .map(|hooks| {
             hooks.values().any(|v| {
                 v.as_array()
-                    .map(|a| a.iter().any(|g| g.get("_source").and_then(|s| s.as_str()) == Some("AgentWatch")))
+                    .map(|a| {
+                        a.iter().any(|g| {
+                            g.get("_source").and_then(|s| s.as_str()) == Some("AgentWatch")
+                        })
+                    })
                     .unwrap_or(false)
             })
         })
@@ -78,7 +81,10 @@ fn hooks_status() -> HooksStatus {
         backup_path: backup.display().to_string(),
         backup_exists: backup.exists(),
         socket_path: server::socket_path(&data_dir()).display().to_string(),
-        events: hook_settings::EVENTS.iter().map(|e| e.to_string()).collect(),
+        events: hook_settings::EVENTS
+            .iter()
+            .map(|e| e.to_string())
+            .collect(),
     }
 }
 

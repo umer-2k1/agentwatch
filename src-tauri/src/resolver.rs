@@ -223,14 +223,24 @@ mod tests {
     fn unreadable_is_unknown_not_idle() {
         let mut f = fact();
         f.readable = false;
-        let s = resolve(&f, &alive(None), None, NOW + 60 * 60 * 1000, Settings::default());
+        let s = resolve(
+            &f,
+            &alive(None),
+            None,
+            NOW + 60 * 60 * 1000,
+            Settings::default(),
+        );
         assert_eq!(s.status, Status::Unknown);
         assert_eq!(s.confidence, Confidence::Unknown);
     }
 
     #[test]
     fn no_liveness_data_is_never_certain() {
-        let s = resolve(&fact(), &alive(None), None, NOW + 60 * 60 * 1000,
+        let s = resolve(
+            &fact(),
+            &alive(None),
+            None,
+            NOW + 60 * 60 * 1000,
             Settings::default(),
         );
         assert_ne!(s.confidence, Confidence::Certain);
@@ -242,7 +252,11 @@ mod tests {
         f.turn_closed = false;
         f.pending_tool = Some("Bash".into());
         // Quiet for three days, no process found.
-        let s = resolve(&f, &alive(None), None, NOW + 3 * 24 * 60 * 60 * 1000,
+        let s = resolve(
+            &f,
+            &alive(None),
+            None,
+            NOW + 3 * 24 * 60 * 60 * 1000,
             Settings::default(),
         );
         assert_eq!(s.status, Status::Unknown);

@@ -45,7 +45,8 @@ pub enum InstallOutcome {
 /// `hook_command` is the absolute path to the helper binary.
 pub fn install(settings_path: &Path, hook_command: &str) -> Result<InstallOutcome, String> {
     let existing = if settings_path.exists() {
-        fs::read_to_string(settings_path).map_err(|e| format!("read {}: {e}", settings_path.display()))?
+        fs::read_to_string(settings_path)
+            .map_err(|e| format!("read {}: {e}", settings_path.display()))?
     } else {
         String::new()
     };
@@ -53,7 +54,8 @@ pub fn install(settings_path: &Path, hook_command: &str) -> Result<InstallOutcom
     let mut root: Value = if existing.trim().is_empty() {
         json!({})
     } else {
-        serde_json::from_str(&existing).map_err(|e| format!("{} is not valid JSON: {e}", settings_path.display()))?
+        serde_json::from_str(&existing)
+            .map_err(|e| format!("{} is not valid JSON: {e}", settings_path.display()))?
     };
 
     if root.get("hooks") == Some(&json!({})) || root.get("hooks").is_none() {
@@ -66,9 +68,13 @@ pub fn install(settings_path: &Path, hook_command: &str) -> Result<InstallOutcom
 
     let mut changed = false;
     for event in EVENTS {
-        let entry = hooks.entry((*event).to_string()).or_insert_with(|| json!([]));
+        let entry = hooks
+            .entry((*event).to_string())
+            .or_insert_with(|| json!([]));
         let Some(arr) = entry.as_array_mut() else {
-            return Err(format!("`hooks.{event}` is not an array; refusing to touch it"));
+            return Err(format!(
+                "`hooks.{event}` is not an array; refusing to touch it"
+            ));
         };
         if arr.iter().any(|g| group_is_ours(g)) {
             continue;
@@ -205,7 +211,11 @@ mod tests {
     fn creates_settings_when_absent() {
         let d = tmp();
         let p = d.join("settings.json");
-        let out = install(&p, "/Applications/AgentWatch.app/Contents/MacOS/agentwatch-hook").unwrap();
+        let out = install(
+            &p,
+            "/Applications/AgentWatch.app/Contents/MacOS/agentwatch-hook",
+        )
+        .unwrap();
         assert!(matches!(out, InstallOutcome::Installed { .. }));
 
         let v = read(&p);
@@ -237,7 +247,9 @@ mod tests {
         assert_eq!(v["model"], "opus", "unrelated settings must survive");
         let stop = v["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop.len(), 2, "user hook + ours");
-        assert!(stop.iter().any(|g| g["hooks"][0]["command"] == "/usr/local/bin/mine"));
+        assert!(stop
+            .iter()
+            .any(|g| g["hooks"][0]["command"] == "/usr/local/bin/mine"));
         assert!(stop.iter().any(|g| g["_source"] == MARKER));
     }
 

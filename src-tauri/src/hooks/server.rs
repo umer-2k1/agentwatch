@@ -28,10 +28,7 @@ pub fn spawn(data_dir: &Path, tx: Sender<HookEvent>) -> std::io::Result<PathBuf>
         let _ = std::fs::remove_file(&path);
     }
     let listener = UnixListener::bind(&path)?;
-    let _ = std::fs::set_permissions(
-        &path,
-        std::os::unix::fs::PermissionsExt::from_mode(0o600),
-    );
+    let _ = std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o600));
 
     thread::spawn(move || {
         for stream in listener.incoming() {
