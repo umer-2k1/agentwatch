@@ -7,7 +7,7 @@ the session files your agents already write — nothing to install, nothing to c
 account, no telemetry — and shows you who is working, who is stuck, who needs you, and who
 has quietly died.
 
-![The AgentWatch board](docs/assets/m0.1-board.png)
+![The AgentWatch board](docs/assets/ui-board.png)
 
 ## Why
 
@@ -18,12 +18,25 @@ and you lose twenty minutes without knowing.
 Every vendor builds a status view for *their own* agent, and will never show you the rest.
 AgentWatch is the neutral one: it shows them all, because it is owned by none of them.
 
+## UI tour
+
+| | |
+|---|---|
+| ![board](docs/assets/ui-board.png) | ![answering](docs/assets/ui-answering.png) |
+| The board: ring = vendor, fill = status | Answering — only agents with a hook get buttons |
+| ![light](docs/assets/ui-light.png) | ![appearance](docs/assets/ui-appearance.png) |
+| Light appearance | Appearance drawer, live preview |
+
+Full tour with notes: [`docs/UI.md`](docs/UI.md).
+
 ## What it does (today)
 
 - One **dot per agent** on the edge of the screen — blue working, amber needs you, green done
 - **`dead`** — the state other dashboards cannot produce, because they never check the process
 - **`unknown`** — when it genuinely cannot tell, it says so rather than guessing
-- Reads **Claude Code** transcripts; more agents are adapters, one file each
+- Reads **Claude Code**, **Codex** and **OpenCode**; each agent is one adapter file
+- Answers **Claude Code** permission prompts without touching your terminal — the hook
+  returns a decision and the agent continues
 
 ## What it does not do
 
