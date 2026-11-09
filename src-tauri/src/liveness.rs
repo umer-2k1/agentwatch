@@ -206,8 +206,12 @@ mod tests {
         assert!(is_agent_process("claude"));
         assert!(is_agent_process("/opt/homebrew/bin/codex"));
         // must not match:
-        assert!(!is_agent_process("/Applications/Claude.app/Contents/MacOS/Claude"));
-        assert!(!is_agent_process("/Applications/Claude.app/Contents/Frameworks/Claude Helper"));
+        assert!(!is_agent_process(
+            "/Applications/Claude.app/Contents/MacOS/Claude"
+        ));
+        assert!(!is_agent_process(
+            "/Applications/Claude.app/Contents/Frameworks/Claude Helper"
+        ));
         assert!(!is_agent_process("/Applications/Claude.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler"));
         assert!(!is_agent_process("node"));
         assert!(!is_agent_process("claude-monitor-helper"));
@@ -231,7 +235,11 @@ mod tests {
 
         l.known.insert(key, 2_000_000_000); // never existed
         let b = l.check_cwd("/tmp");
-        assert_eq!(b.alive, Some(false), "a remembered pid that is gone means dead");
+        assert_eq!(
+            b.alive,
+            Some(false),
+            "a remembered pid that is gone means dead"
+        );
     }
 
     #[test]

@@ -31,11 +31,8 @@ struct Fixture {
 
 impl Fixture {
     fn new(tag: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!(
-            "agentwatch-test-{}-{}",
-            std::process::id(),
-            tag
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("agentwatch-test-{}-{}", std::process::id(), tag));
         let project = dir.join("shop-api");
         fs::create_dir_all(&project).unwrap();
 
@@ -109,9 +106,11 @@ fn liveness_end_to_end() {
     let mut child = fx.spawn_agent();
 
     let live = tick(&mut store);
-    println!("alive  -> {:?} (pid {:?})",
+    println!(
+        "alive  -> {:?} (pid {:?})",
         live.iter().map(|s| s.status).collect::<Vec<_>>(),
-        live.iter().map(|s| s.pid).collect::<Vec<_>>());
+        live.iter().map(|s| s.pid).collect::<Vec<_>>()
+    );
 
     assert_eq!(
         live.first().map(|s| s.status),
@@ -129,9 +128,14 @@ fn liveness_end_to_end() {
     thread::sleep(Duration::from_millis(300));
 
     let after = tick(&mut store);
-    println!("killed -> {:?} ({} )",
+    println!(
+        "killed -> {:?} ({} )",
         after.iter().map(|s| s.status).collect::<Vec<_>>(),
-        after.first().map(|s| s.evidence.detail.clone()).unwrap_or_default());
+        after
+            .first()
+            .map(|s| s.evidence.detail.clone())
+            .unwrap_or_default()
+    );
 
     assert_eq!(
         after.first().map(|s| s.status),
@@ -153,8 +157,10 @@ fn liveness_end_to_end() {
 
     let mut store2 = Store::with_window(1);
     let rows = tick(&mut store2);
-    println!("noproc -> {:?}",
-        rows.iter().map(|s| s.status).collect::<Vec<_>>());
+    println!(
+        "noproc -> {:?}",
+        rows.iter().map(|s| s.status).collect::<Vec<_>>()
+    );
 
     assert!(
         rows.iter().all(|s| s.status != Status::Dead),
