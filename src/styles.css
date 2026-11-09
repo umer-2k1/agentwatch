@@ -310,3 +310,23 @@ html[data-theme="light"] {
 }
 .swatch.on { border-color: var(--text); }
 input[type="range"] { accent-color: var(--accent); width: 130px; }
+
+/* ---- answering ---- */
+.row .right { display: flex; align-items: center; }
+.answer-keys { display: flex; gap: 6px; }
+.answer-keys button {
+  font: inherit; font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line-strong);
+  background: transparent; color: var(--text);
+}
+.answer-keys button[data-allow]:hover {
+  border-color: color-mix(in srgb, var(--done) 60%, var(--line));
+  background: color-mix(in srgb, var(--done) 18%, transparent);
+  color: var(--done);
+}
+.answer-keys button[data-deny]:hover {
+  border-color: color-mix(in srgb, var(--dead) 60%, var(--line));
+  background: color-mix(in srgb, var(--dead) 16%, transparent);
+  color: var(--dead);
+}

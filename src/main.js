@@ -41,6 +41,7 @@ function providerOf(s) {
 }
 
 let latest = [];
+let awaiting = new Set();
 
 function label(s) {
   return s.title || s.repo || "Claude Code";
@@ -64,7 +65,8 @@ function fmtAge(sec) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-function render(sessions) {
+function render(sessions, awaitingIds) {
+  if (awaitingIds) awaiting = new Set(awaitingIds);
   latest = sessions;
 
   // Counts in the header.
@@ -114,7 +116,13 @@ function render(sessions) {
           ${s.pid ? `<span>pid ${s.pid}</span>` : ""}
         </div>
       </div>
-      <span class="pill ${s.status}">${pretty(s.status)}${s.confidence === "unknown" ? " ?" : ""}</span>`;
+      <div class="right">
+        ${
+          awaiting.has(s.id)
+            ? `<span class="answer-keys"><button data-allow="${s.id}">1 Allow</button><button data-deny="${s.id}">2 Deny</button></span>`
+            : `<span class="pill ${s.status}">${pretty(s.status)}${s.confidence === "unknown" ? " ?" : ""}</span>`
+        }
+      </div>`;
     el.list.appendChild(row);
   }
 }
@@ -125,6 +133,23 @@ function pretty(s) {
 
 function escapeHtml(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/** Answer a blocked turn. The optimistic update is deliberate: the helper may already have
+ *  timed out, in which case the command returns false and we simply re-render. */
+async function decide(sessionId, decision) {
+  try {
+    await invoke("answer", { sessionId, decision });
+  } catch (_) {}
+  awaiting.delete(sessionId);
+  refresh();
+}
+
+async function refresh() {
+  try {
+    const [sessions, pending] = await Promise.all([invoke("get_sessions"), invoke("awaiting")]);
+    render(sessions, pending);
+  } catch (_) {}
 }
 
 async function renderProviders() {
@@ -237,24 +262,41 @@ function wireDrawer() {
   });
 }
 
+function wireKeys() {
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+    const first = [...awaiting][0];
+    if (!first) return;
+    if (e.key === "1") { e.preventDefault(); decide(first, "allow"); }
+    if (e.key === "2") { e.preventDefault(); decide(first, "deny"); }
+  });
+
+  document.getElementById("list").addEventListener("click", (e) => {
+    const allow = e.target.closest("button[data-allow]");
+    const deny = e.target.closest("button[data-deny]");
+    if (allow) decide(allow.dataset.allow, "allow");
+    if (deny) decide(deny.dataset.deny, "deny");
+  });
+}
+
 async function boot() {
   loadPrefs();
   buildDrawer();
   wireDrawer();
   applyPrefs();
 
-  render(await invoke("get_sessions"));
+  await refresh();
   renderProviders();
+  wireKeys();
 
   // Push updates.
   await listen("sessions", (event) => render(event.payload));
 
   // Safety net if an event is missed.
-  setInterval(async () => {
-    try {
-      render(await invoke("get_sessions"));
-    } catch (_) {}
-  }, 2000);
+  setInterval(refresh, 1000);
 
   setInterval(renderProviders, 5000);
 }
