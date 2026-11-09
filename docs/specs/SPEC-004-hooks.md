@@ -1,6 +1,6 @@
 # SPEC-004 — Hooks
 
-Status: **installer + event ingestion shipped; answering not yet**
+Status: **installer + helper + ingestion shipped and proven; answering not yet**
 Related: D-005, SPEC-001
 
 ## Why hooks exist at all
@@ -56,9 +56,24 @@ is not waiting on you.
 A waiting entry is dropped when its session leaves the board, so an amber dot can never
 outlive its agent. Implemented in `Store::prune_waiting`.
 
+## Shipped and proven
+
+`tests/hook_pipeline.rs` runs the **real helper binary** with a **real Claude-shaped payload**,
+over a **real socket**, into the **real store**, and asserts the dot turns amber with
+`certain` confidence — then clears when a `PostToolUse` arrives.
+
+## Helper contract (`agentwatch-hook`)
+
+| Property | Rule |
+|---|---|
+| Exit code | **always 0** — a missing app must be invisible to the agent |
+| Timeout | 400 ms on both write and ack read |
+| stdout | nothing, for now (v0.2 prints a decision here) |
+| stdin | the raw Claude Code payload, read to EOF |
+| socket | `~/Library/Application Support/AgentWatch/events.sock`, overridable with `AGENTWATCH_SOCKET` |
+
 ## Not yet built
 
-- The helper binary itself (`agentwatch-hook`) — must be shipped next to the app binary.
 - **Answering.** The hard part: our helper blocks, the app returns a decision, the helper
   prints `hookSpecificOutput` and exits 0. Until then the amber dot is informative only.
 - `PermissionRequest` is accepted in the event model but Claude Code's exact naming must be
