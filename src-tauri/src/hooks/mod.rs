@@ -4,5 +4,6 @@
 //! in the terminal UI. Hooks are the only way to learn it (SPEC-001).
 
 pub mod event;
+pub mod forward;
 pub mod server;
 pub mod settings;

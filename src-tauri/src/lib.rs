@@ -3,7 +3,7 @@
 //! Wiring only: build the store, start the poll loop, expose two commands to the UI.
 //! All logic lives in `providers/`, `resolver.rs`, `liveness.rs` and `store.rs`.
 
-mod hooks;
+pub mod hooks;
 mod liveness;
 pub mod model;
 mod providers;
