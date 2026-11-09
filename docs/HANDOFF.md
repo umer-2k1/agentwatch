@@ -1,6 +1,6 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-09 (session 3)
+**Last updated:** 2026-11-09 (session 4)
 **Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
@@ -19,7 +19,7 @@
 | Hook installer | ✅ idempotent, backed up, 7 tests |
 | Hook event socket | ✅ listener + event model, 6 tests |
 | Hook helper binary | ✅ `agentwatch-hook`, proven through the real binary |
-| Hook answering | ❌ not built |
+| Hook answering | ✅ `permissionDecision` proven both ways |
 | Appearance drawer | ✅ 5 controls, live preview, persisted |
 | Theming | ❌ M0.3 |
 
@@ -130,3 +130,24 @@ Both are recorded in `03-decisions.md`. This is exactly why the live test exists
 | A hook must never fail the agent | every error path returns, `main` exits 0 unconditionally |
 | Missing ack must not block | 400 ms read timeout; the write result is ignored |
 | `localStorage` is per-webview | the overlay window will need the same prefs — move to config before that |
+
+---
+
+# Session 4 — answering works
+
+## Shipped
+- **Two-way hook protocol.** `PreToolUse` is held open; the app answers; the helper prints
+  `{"hookSpecificOutput":{"permissionDecision":"allow"}}` and exits 0.
+- **Bounded on both ends**: helper 13 s, app 15 s. The helper always gives up first.
+- **Safe fallback proven**: no answer ⇒ empty stdout ⇒ Claude Code's own terminal prompt.
+- **Inbox answering UI**: blocked rows show `1 Allow` / `2 Deny`; keys work window-wide.
+
+## Evidence
+`tests/hook_pipeline.rs` — 5 tests, including the real binary printing a real
+`permissionDecision`, and the timeout case printing nothing.
+
+## Next
+1. Live test against a real Claude Code install (everything so far uses a generated payload
+   of the verified shape).
+2. 2-second undo before the decision is sent.
+3. Edge overlay (M0.1b) · theming persistence to `config.json` · more providers.

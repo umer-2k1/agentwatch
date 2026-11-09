@@ -1,6 +1,6 @@
 # SPEC-004 — Hooks
 
-Status: **installer + helper + ingestion shipped and proven; answering not yet**
+Status: **complete for Claude Code — install, ingest, and answer, all proven**
 Related: D-005, SPEC-001
 
 ## Why hooks exist at all
@@ -72,9 +72,39 @@ over a **real socket**, into the **real store**, and asserts the dot turns amber
 | stdin | the raw Claude Code payload, read to EOF |
 | socket | `~/Library/Application Support/AgentWatch/events.sock`, overridable with `AGENTWATCH_SOCKET` |
 
+## Answering (shipped)
+
+`PreToolUse` is the only event that can carry a decision, because it is the only one Claude
+Code blocks on. The trip:
+
+```
+Claude Code ──stdin payload──▶ agentwatch-hook
+                                   │  one line over events.sock
+                                   ▼
+                              AgentWatch app ──user presses 1 / 2──▶
+                                   │  {"decision":"allow"}
+                                   ▼
+Claude Code ◀──stdout permissionDecision── agentwatch-hook exits 0
+```
+
+| Rule | Why |
+|---|---|
+| Only `PreToolUse` is held open | `Notification` is fire-and-forget; answering there does nothing |
+| Helper waits 13 s, app waits 15 s | the **helper must always give up first**, so no agent is left waiting on a socket that will not speak |
+| No answer ⇒ print **nothing**, exit 0 | identical to AgentWatch not being installed. The terminal prompt runs. That is the safe default |
+| `Decision::Ask` emits no JSON | same guarantee, at the type level |
+| Dropping the sender closes the connection | "forget this" and "never answer" are one code path |
+
+`tests/hook_pipeline.rs` proves both directions: an answer produces
+`{"hookSpecificOutput":{"permissionDecision":"allow"}}`, and no answer produces empty stdout
+with exit 0.
+
+Keys: `1` allow, `2` deny, on the blocked row or from anywhere in the window.
+
 ## Not yet built
 
-- **Answering.** The hard part: our helper blocks, the app returns a decision, the helper
-  prints `hookSpecificOutput` and exits 0. Until then the amber dot is informative only.
+- Live verification against a real Claude Code install (everything is proven against a
+  generated payload of the same shape).
 - `PermissionRequest` is accepted in the event model but Claude Code's exact naming must be
-  verified against a live install before we rely on it.
+  verified before we rely on it.
+- Rules / auto-approval (D-005) — the policy engine is deliberately empty.

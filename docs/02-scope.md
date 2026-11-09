@@ -18,13 +18,14 @@ In scope:
 
 Out of scope: hooks, inbox, theming, history, other agents.
 
-## v0.2 — Answer (`M0.2`)  — 60% done
+## v0.2 — Answer (`M0.2`)  — 80% done
 
 - [x] Hook installer for Claude Code (`~/.claude/settings.json`, backed up, idempotent)
 - [x] Unix socket event listener + `agentwatch-hook` helper binary
 - [x] `needsYou` derived from hooks, outranking file inference, proven end-to-end
-- [ ] Inbox: list of blockers, `1–9` to answer, 2s undo
-- [ ] Answering: helper blocks, app returns a decision, helper prints `hookSpecificOutput`
+- [x] Inbox: blocked rows with `1` allow / `2` deny
+- [x] Answering: helper blocks, app returns a decision, helper prints `hookSpecificOutput`
+- [ ] 2-second undo
 - [ ] Jump-to-agent for supported terminals
 
 ## v0.3 — Look (`M0.3`)
