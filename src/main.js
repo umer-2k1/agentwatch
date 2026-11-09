@@ -141,7 +141,108 @@ async function renderProviders() {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Appearance
+ *
+ * Everything is a CSS custom property, so a theme change is one attribute write and the
+ * whole board follows. Preferences persist in localStorage; M0.3b moves them into the
+ * app's config file once the Rust side owns settings.
+ * ------------------------------------------------------------------ */
+
+const ACCENTS = ["#0a84ff", "#ff9f0a", "#30d158", "#bf5af2", "#ff375f", "#64d2ff", "#e8e8ed"];
+
+const defaults = { theme: "dark", accent: "#0a84ff", shape: "circle", density: "cozy", glass: 24 };
+let prefs = { ...defaults };
+
+function loadPrefs() {
+  try {
+    prefs = { ...defaults, ...JSON.parse(localStorage.getItem("agentwatch.prefs") || "{}") };
+  } catch (_) {
+    prefs = { ...defaults };
+  }
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem("agentwatch.prefs", JSON.stringify(prefs));
+  } catch (_) {}
+}
+
+function resolvedTheme() {
+  if (prefs.theme !== "system") return prefs.theme;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyPrefs() {
+  const root = document.documentElement;
+  root.dataset.theme = resolvedTheme();
+  root.dataset.shape = prefs.shape;
+  root.dataset.density = prefs.density;
+  root.style.setProperty("--accent", prefs.accent);
+  root.style.setProperty("--blur-amount", `${prefs.glass}px`);
+
+  // reflect state in the drawer
+  document.querySelectorAll('.seg[data-key]').forEach((seg) => {
+    const key = seg.dataset.key;
+    seg.querySelectorAll("button").forEach((b) =>
+      b.classList.toggle("on", b.dataset.val === prefs[key])
+    );
+  });
+  document.querySelectorAll(".swatch").forEach((sw) =>
+    sw.classList.toggle("on", sw.dataset.val === prefs.accent)
+  );
+  const glass = document.getElementById("glass");
+  if (glass) glass.value = String(prefs.glass);
+}
+
+function buildDrawer() {
+  const holder = document.querySelector('.swatches[data-key="accent"]');
+  holder.innerHTML = ACCENTS.map(
+    (c) =>
+      `<button class="swatch" data-val="${c}" style="background:${c}" aria-label="Accent ${c}"></button>`
+  ).join("");
+}
+
+function wireDrawer() {
+  document.getElementById("gear").addEventListener("click", () => {
+    document.getElementById("drawer").classList.toggle("open");
+  });
+
+  document.querySelectorAll(".seg[data-key]").forEach((seg) => {
+    seg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-val]");
+      if (!btn) return;
+      prefs[seg.dataset.key] = btn.dataset.val;
+      savePrefs();
+      applyPrefs();
+    });
+  });
+
+  document.querySelector(".swatches").addEventListener("click", (e) => {
+    const sw = e.target.closest(".swatch");
+    if (!sw) return;
+    prefs.accent = sw.dataset.val;
+    savePrefs();
+    applyPrefs();
+  });
+
+  document.getElementById("glass").addEventListener("input", (e) => {
+    prefs.glass = Number(e.target.value);
+    savePrefs();
+    applyPrefs();
+  });
+
+  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+    if (prefs.theme === "system") applyPrefs();
+  });
+}
+
 async function boot() {
+  loadPrefs();
+  buildDrawer();
+  wireDrawer();
+  applyPrefs();
+
   render(await invoke("get_sessions"));
   renderProviders();
 

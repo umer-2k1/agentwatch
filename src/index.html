@@ -14,7 +14,42 @@
         <span class="name">AgentWatch</span>
       </div>
       <div class="counts" id="counts"></div>
+      <button class="gear" id="gear" title="Appearance" aria-label="Appearance">⌘</button>
     </header>
+
+    <section class="drawer" id="drawer" aria-label="Appearance settings">
+      <div class="drawer-row">
+        <label>Appearance</label>
+        <div class="seg" data-key="theme">
+          <button data-val="dark">Dark</button>
+          <button data-val="light">Light</button>
+          <button data-val="system">System</button>
+        </div>
+      </div>
+      <div class="drawer-row">
+        <label>Accent</label>
+        <div class="swatches" data-key="accent"></div>
+      </div>
+      <div class="drawer-row">
+        <label>Dot shape</label>
+        <div class="seg" data-key="shape">
+          <button data-val="circle">Circle</button>
+          <button data-val="pill">Pill</button>
+          <button data-val="square">Square</button>
+        </div>
+      </div>
+      <div class="drawer-row">
+        <label>Density</label>
+        <div class="seg" data-key="density">
+          <button data-val="cozy">Cozy</button>
+          <button data-val="compact">Compact</button>
+        </div>
+      </div>
+      <div class="drawer-row">
+        <label>Glass</label>
+        <input type="range" id="glass" min="0" max="30" step="2" value="24" />
+      </div>
+    </section>
 
     <section class="strip" id="strip" aria-label="Agents"></section>
 
