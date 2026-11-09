@@ -1,26 +1,38 @@
-//! Unix-socket listener for hook events.
+//! Unix-socket listener for hook events, and the trip back.
 //!
-//! The helper binary connects, writes one JSON line, and exits. We never accept anything
-//! from the network — the socket lives in the user's application-support directory with
-//! owner-only permissions.
+//! Two kinds of traffic:
+//!
+//! * **Fire-and-forget** (`Notification`, `Stop`, …) — the helper writes a line and leaves.
+//! * **Decision** (`PreToolUse`) — the helper writes a line and *waits*. We hold the
+//!   connection open until the user answers in the inbox, then write the decision back.
+//!
+//! The wait is bounded on both sides. A hook that never returns would freeze the user's
+//! agent, which is a far worse failure than "I did not answer in time".
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::time::Duration;
 
-use super::event::HookEvent;
+use super::event::{Decision, HookEvent};
+
+/// How long the app will hold a `PreToolUse` connection waiting for a human.
+/// The helper times out slightly earlier, so it is always the helper that gives up first.
+pub const DECISION_TIMEOUT: Duration = Duration::from_millis(15_000);
+
+/// An event plus, for decision-capable events, the channel to answer on.
+pub struct Pending {
+    pub event: HookEvent,
+    pub reply: Option<Sender<Decision>>,
+}
 
 pub fn socket_path(data_dir: &Path) -> PathBuf {
     data_dir.join("events.sock")
 }
 
-/// Bind the socket and forward parsed events to `tx`.
-///
-/// A stale socket file from a previous run is removed first; binding is the only operation
-/// that can fail hard, and failing to listen must never take the app down.
-pub fn spawn(data_dir: &Path, tx: Sender<HookEvent>) -> std::io::Result<PathBuf> {
+pub fn spawn(data_dir: &Path, tx: Sender<Pending>) -> std::io::Result<PathBuf> {
     std::fs::create_dir_all(data_dir)?;
     let path = socket_path(data_dir);
 
@@ -33,23 +45,52 @@ pub fn spawn(data_dir: &Path, tx: Sender<HookEvent>) -> std::io::Result<PathBuf>
     thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(stream) = stream else { continue };
-            let mut reader = BufReader::new(stream);
-            let mut line = String::new();
-            if reader.read_line(&mut line).is_err() {
-                continue;
-            }
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            if let Ok(ev) = serde_json::from_str::<HookEvent>(line) {
-                // Ack so the helper knows we took it. A dropped ack must not block the
-                // agent, so the write result is intentionally ignored.
-                let _ = reader.get_mut().write_all(b"ok\n");
-                let _ = tx.send(ev);
-            }
+            // One thread per connection: a waiting PreToolUse must not block the next
+            // Notification from another agent.
+            thread::spawn(move || handle(stream, tx));
         }
     });
 
     Ok(path)
+}
+
+fn handle(mut stream: std::os::unix::net::UnixStream, tx: Sender<Pending>) {
+    let mut line = String::new();
+    {
+        let mut reader = BufReader::new(&stream);
+        if reader.read_line(&mut line).is_err() {
+            return;
+        }
+    }
+    let line = line.trim();
+    if line.is_empty() {
+        return;
+    }
+    let Ok(ev) = serde_json::from_str::<HookEvent>(line) else {
+        return;
+    };
+
+    if !ev.wants_decision() {
+        let _ = stream.write_all(b"ok\n");
+        let _ = tx.send(Pending { event: ev, reply: None });
+        return;
+    }
+
+    let (reply_tx, reply_rx): (Sender<Decision>, Receiver<Decision>) = std::sync::mpsc::channel();
+    if tx
+        .send(Pending {
+            event: ev,
+            reply: Some(reply_tx),
+        })
+        .is_err()
+    {
+        return;
+    }
+
+    // Nobody answers => `Ask`, which hands the question back to Claude Code's own prompt.
+    let decision = reply_rx.recv_timeout(DECISION_TIMEOUT).unwrap_or(Decision::Ask);
+    let body = serde_json::json!({ "decision": decision });
+    let mut out = body.to_string();
+    out.push('\n');
+    let _ = stream.write_all(out.as_bytes());
 }

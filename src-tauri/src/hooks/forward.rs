@@ -17,8 +17,14 @@ use std::time::Duration;
 
 use super::event::HookEvent;
 
-/// How long the helper will wait for the app to acknowledge. Deliberately tiny.
+/// How long the helper waits for an acknowledgement on a fire-and-forget event.
 pub const ACK_TIMEOUT: Duration = Duration::from_millis(400);
+
+/// How long the helper will hold a `PreToolUse` open waiting for a human answer.
+///
+/// Shorter than the app's own timeout on purpose: the helper must always be the one that
+/// gives up first, so the agent is never left waiting on a socket that will not speak.
+pub const WAIT_TIMEOUT: Duration = Duration::from_millis(13_000);
 
 /// Normalise a raw payload. Returns `None` when there is nothing useful in it.
 pub fn to_event(payload: &str) -> Option<HookEvent> {
@@ -44,8 +50,47 @@ pub fn to_event(payload: &str) -> Option<HookEvent> {
     })
 }
 
-/// Deliver an event. Best-effort by design: a missing app is not an error worth reporting
-/// to the user's agent, so the result is a plain bool rather than a `Result`.
+/// Deliver an event and, for a decision-capable event, wait for the answer.
+///
+/// Returns the decision to print for Claude Code. `None` means "no opinion" — the hook
+/// prints nothing and the terminal prompts exactly as it would without us.
+pub fn deliver(socket: &std::path::Path, ev: &HookEvent) -> Option<super::event::Decision> {
+    let Ok(mut stream) = UnixStream::connect(socket) else {
+        return None; // AgentWatch is not running: behave as if not installed.
+    };
+
+    let wait = if ev.wants_decision() {
+        WAIT_TIMEOUT
+    } else {
+        ACK_TIMEOUT
+    };
+    let _ = stream.set_write_timeout(Some(ACK_TIMEOUT));
+    let _ = stream.set_read_timeout(Some(wait));
+
+    let mut line = serde_json::to_string(ev).ok()?;
+    line.push('\n');
+    if stream.write_all(line.as_bytes()).is_err() {
+        return None;
+    }
+
+    let mut reply = String::new();
+    let _ = BufReader::new(stream).read_line(&mut reply);
+
+    let reply = reply.trim();
+    if reply.is_empty() || reply == "ok" {
+        return None;
+    }
+    match serde_json::from_str::<serde_json::Value>(reply) {
+        Ok(v) => match v.get("decision").and_then(|d| d.as_str()) {
+            Some("allow") => Some(super::event::Decision::Allow),
+            Some("deny") => Some(super::event::Decision::Deny),
+            _ => None,
+        },
+        Err(_) => None,
+    }
+}
+
+/// Fire-and-forget delivery. Kept for events that cannot carry a decision.
 pub fn send(socket: &std::path::Path, ev: &HookEvent) -> bool {
     let Ok(mut stream) = UnixStream::connect(socket) else {
         return false;
