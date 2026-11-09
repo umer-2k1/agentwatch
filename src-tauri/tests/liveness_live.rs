@@ -1,13 +1,17 @@
 //! Does `dead` actually work?
 //!
-//! This is the claim nobody else makes, so it gets its own end-to-end test rather than a
-//! unit test with a faked boolean. It exercises the real chain:
+//! This is the claim nobody else makes, so it gets an end-to-end test rather than a unit
+//! test with a faked boolean. It exercises the real chain:
 //!
 //!   transcript on disk -> provider -> liveness scan (ps + lsof) -> resolver
 //!
-//! A stand-in process named `claude` is used (a copy of /bin/sleep), because the scanner
-//! matches on process name and working directory — exactly what a real agent exposes.
-//! A real agent would make the test slow, costly and racy; this is deterministic.
+//! A stand-in process named `claude` is used (a **symlink** to /bin/sleep — a copy loses
+//! its code signature and macOS kills it instantly). The scanner matches on process name
+//! and working directory, which is exactly what a real agent exposes, so every line that
+//! matters runs for real.
+//!
+//! **One test, not two.** The provider root is configured through a process-wide env var,
+//! so two parallel tests would clobber each other's fixture. Sequential phases instead.
 //!
 //! Run: cargo test --test liveness_live -- --nocapture
 
@@ -17,8 +21,8 @@ use std::process::{Child, Command};
 use std::thread;
 use std::time::Duration;
 
-use agentwatch_lib::debug_sessions;
 use agentwatch_lib::model::Status;
+use agentwatch_lib::store::Store;
 
 struct Fixture {
     dir: PathBuf,
@@ -41,10 +45,8 @@ impl Fixture {
         let sessions = dir.join("claude-root/projects/-Users-test-shop-api");
         fs::create_dir_all(&sessions).unwrap();
 
-        // A turn that never closed: a tool is "running". If the process is alive this is
-        // `working`; if it dies it must become `dead` (SPEC-001 rule 2 before rule 5).
-        // Built with serde_json rather than string escaping — escaping bugs here would make
-        // the test pass for the wrong reason.
+        // A turn that never closed: a tool is "running". Alive => working, killed => dead.
+        // Built with serde_json so an escaping bug cannot make this pass for the wrong reason.
         let line = serde_json::json!({
             "type": "assistant",
             "sessionId": "test-session",
@@ -67,82 +69,95 @@ impl Fixture {
         Self { dir, project }
     }
 
-    /// A process whose name the scanner recognises, started in the project directory.
     fn spawn_agent(&self) -> Child {
         let exe = self.dir.join("claude");
         if !exe.exists() {
-            fs::copy("/bin/sleep", &exe).unwrap();
+            std::os::unix::fs::symlink("/bin/sleep", &exe).unwrap();
         }
         let child = Command::new(&exe)
             .arg("300")
             .current_dir(&self.project)
             .spawn()
             .expect("spawn stand-in agent");
-        // Give ps/lsof a moment to see it.
-        thread::sleep(Duration::from_millis(700));
+        thread::sleep(Duration::from_millis(700)); // let ps/lsof see it
         child
     }
 }
 
 impl Drop for Fixture {
     fn drop(&mut self) {
+        // The agent may still be running if an assertion failed early.
+        let _ = Command::new("pkill")
+            .args(["-f", &self.dir.to_string_lossy()])
+            .status();
         let _ = fs::remove_dir_all(&self.dir);
-        std::env::remove_var("AGENTWATCH_CLAUDE_ROOT");
     }
 }
 
-fn statuses() -> Vec<Status> {
-    debug_sessions(1).iter().map(|s| s.status).collect()
+/// Tick a *single* store, the way the app does. Recreating the store between phases would
+/// wipe the liveness memory that makes `dead` reachable at all.
+fn tick(store: &mut Store) -> Vec<agentwatch_lib::model::Session> {
+    store.tick().to_vec()
 }
 
 #[test]
-fn alive_agent_is_working_and_a_killed_agent_is_dead() {
-    let fx = Fixture::new("dead");
-
+fn liveness_end_to_end() {
+    // ---- Phase 1: alive + open turn => working -------------------------------
+    // Fixture first: the provider reads its root (env) when the store is constructed.
+    let fx = Fixture::new("alive");
+    let mut store = Store::with_window(1);
     let mut child = fx.spawn_agent();
 
-    // 1. Alive + open turn  => working
-    let live = debug_sessions(1);
-    println!("alive: {:?}", live.iter().map(|s| s.status).collect::<Vec<_>>());
-    for s in &live {
-        println!("FACT: {:#?}", s.fact);
-    }
+    let live = tick(&mut store);
+    println!("alive  -> {:?} (pid {:?})",
+        live.iter().map(|s| s.status).collect::<Vec<_>>(),
+        live.iter().map(|s| s.pid).collect::<Vec<_>>());
+
+    assert_eq!(
+        live.first().map(|s| s.status),
+        Some(Status::Working),
+        "a live agent with an open turn must be `working`"
+    );
     assert!(
-        live.iter().any(|s| s.status == Status::Working),
-        "expected `working` while the process is alive, got {:?}",
-        statuses()
+        live.first().and_then(|s| s.pid).is_some(),
+        "liveness must bind the session to a pid"
     );
 
-    // 2. Kill it => dead, within one tick
+    // ---- Phase 2: killed => dead, within one tick ----------------------------
     child.kill().unwrap();
     let _ = child.wait();
-    thread::sleep(Duration::from_millis(400));
+    thread::sleep(Duration::from_millis(300));
 
-    let after = debug_sessions(1);
-    println!("killed: {:?}", after.iter().map(|s| s.status).collect::<Vec<_>>());
-    println!("AFTER: {:#?}", after);
+    let after = tick(&mut store);
+    println!("killed -> {:?} ({} )",
+        after.iter().map(|s| s.status).collect::<Vec<_>>(),
+        after.first().map(|s| s.evidence.detail.clone()).unwrap_or_default());
+
     assert_eq!(
         after.first().map(|s| s.status),
         Some(Status::Dead),
         "a killed agent must resolve to `dead`, not `working` or `idle`"
     );
+    // A process fact, not a guess.
+    assert_eq!(
+        format!("{:?}", after[0].confidence).to_lowercase(),
+        "certain",
+        "death must be `certain`, never `inferred`"
+    );
 
-    // 3. And it must be certain, not inferred — this is a process fact.
-    let s = &after[0];
-    println!("evidence: {}", s.evidence.detail);
-    assert_eq!(format!("{:?}", s.confidence).to_lowercase(), "certain");
-}
+    drop(fx);
 
-#[test]
-fn no_process_yields_unknown_not_dead() {
-    // Transcript exists, but nothing is running it. We must not claim it died.
-    let fx = Fixture::new("unknown");
-    let _ = &fx; // keep the fixture alive; no process spawned
+    // ---- Phase 3: never had a process => never `dead` ------------------------
+    let fx2 = Fixture::new("noproc");
+    let _ = &fx2; // transcript exists, nothing runs it
 
-    let rows = debug_sessions(1);
-    println!("no process: {:?}", rows.iter().map(|s| s.status).collect::<Vec<_>>());
+    let mut store2 = Store::with_window(1);
+    let rows = tick(&mut store2);
+    println!("noproc -> {:?}",
+        rows.iter().map(|s| s.status).collect::<Vec<_>>());
+
     assert!(
         rows.iter().all(|s| s.status != Status::Dead),
-        "without process data we must never assert death"
+        "without having observed a process we must never assert death"
     );
 }

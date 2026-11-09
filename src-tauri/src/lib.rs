@@ -7,7 +7,7 @@ mod liveness;
 pub mod model;
 mod providers;
 mod resolver;
-mod store;
+pub mod store;
 
 use std::sync::{Arc, Mutex};
 use std::thread;
