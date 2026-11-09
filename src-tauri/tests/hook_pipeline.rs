@@ -227,3 +227,50 @@ fn answering_a_pre_tool_use_returns_a_permission_decision() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// The fallback that matters more than the feature: if nobody answers, the helper prints
+/// **nothing** and exits 0, so Claude Code prompts in the terminal exactly as it would have
+/// without AgentWatch installed. A silent hook is a safe hook.
+#[test]
+fn an_unanswered_hook_falls_back_to_the_terminal_prompt() {
+    use agentwatch_lib::hooks::server;
+
+    let dir = tmp("timeout");
+    let socket = dir.join("events.sock");
+
+    // An app that receives the event but never answers — the user is away.
+    let (tx, rx) = std::sync::mpsc::channel::<server::Pending>();
+    server::spawn(&dir, tx).unwrap();
+    let _holder = thread::spawn(move || {
+        let _pending = rx.recv();
+        thread::sleep(std::time::Duration::from_millis(1500));
+    });
+
+    let exe = env!("CARGO_BIN_EXE_agentwatch-hook");
+    let mut child = Command::new(exe)
+        .env("AGENTWATCH_SOCKET", &socket)
+        .env("AGENTWATCH_WAIT_MS", "250")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn helper");
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(
+            br#"{"hook_event_name":"PreToolUse","session_id":"dec2","tool_name":"Bash"}"#,
+        )
+        .unwrap();
+
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success(), "must still exit 0");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).trim().is_empty(),
+        "an unanswered hook must print nothing, so the terminal prompt still runs"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -60,7 +60,12 @@ pub fn deliver(socket: &std::path::Path, ev: &HookEvent) -> Option<super::event:
     };
 
     let wait = if ev.wants_decision() {
-        WAIT_TIMEOUT
+        // Tests shorten this; production uses the constant.
+        std::env::var("AGENTWATCH_WAIT_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(Duration::from_millis)
+            .unwrap_or(WAIT_TIMEOUT)
     } else {
         ACK_TIMEOUT
     };
