@@ -7,6 +7,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use std::collections::HashMap;
+
+use crate::hooks::event::HookEvent;
 use crate::liveness::Liveness;
 use crate::model::Session;
 use crate::providers::{claude::ClaudeProvider, Provider};
@@ -17,6 +20,8 @@ pub struct Store {
     liveness: Liveness,
     settings: Settings,
     last: Vec<Session>,
+    /// session id -> why the hook says it is blocked. Authoritative over file inference.
+    waiting: HashMap<String, String>,
 }
 
 /// A provider row for the UI's "what we support" list (D-003 badge).
@@ -43,6 +48,7 @@ impl Store {
             liveness: Liveness::new(),
             settings: Settings::default(),
             last: Vec::new(),
+            waiting: HashMap::new(),
         }
     }
 
@@ -55,22 +61,56 @@ impl Store {
         self.settings.idle_after_s = secs.max(60);
     }
 
+    /// Fold a hook event into the waiting state.
+    ///
+    /// This is the only code path that can produce `needsYou`, which is why it is small and
+    /// boring: events either set a reason or clear it.
+    pub fn apply_hook(&mut self, ev: HookEvent) {
+        let Some(key) = ev.key() else { return };
+        if ev.is_waiting() {
+            self.waiting.insert(key, ev.detail());
+        } else if ev.clears_waiting() {
+            self.waiting.remove(&key);
+        }
+    }
+
+    pub fn is_waiting(&self, session_id: &str) -> Option<&str> {
+        self.waiting.get(session_id).map(|s| s.as_str())
+    }
+
     /// Poll every provider, resolve, sort. Returns the new snapshot.
     pub fn tick(&mut self) -> &[Session] {
         let now = now_ms();
         let mut out: Vec<Session> = Vec::new();
 
+        // Snapshot of the waiting map, so providers can be polled while borrowing self.
+        let waiting = self.waiting.clone();
+        let mut liveness = std::mem::take(&mut self.liveness);
         for p in self.providers.iter_mut() {
             for fact in p.poll(now) {
-                let live = self.liveness.check_cwd(&fact.cwd);
-                out.push(resolve(&fact, &live, None, now, self.settings));
+                let live = liveness.check_cwd(&fact.cwd);
+                let hook = waiting.get(&fact.id).map(|s| s.as_str());
+                out.push(resolve(&fact, &live, hook, now, self.settings));
             }
         }
+        self.liveness = liveness;
 
         // Most urgent first: needs-you, then dead, then working.
         out.sort_by_key(|s| (s.status.urgency(), s.status.as_str(), s.fact.title.clone()));
         self.last = out;
+        self.prune_waiting();
         &self.last
+    }
+
+    /// Forget blockers for sessions that are no longer on the board. Without this a stale
+    /// amber dot could outlive its agent forever.
+    fn prune_waiting(&mut self) {
+        let live: std::collections::HashSet<String> =
+            self.last.iter().map(|s| s.fact.id.clone()).collect();
+        if live.is_empty() {
+            return; // nothing seen yet this tick; do not wipe real state
+        }
+        self.waiting.retain(|k, _| live.contains(k));
     }
 
     pub fn snapshot(&self) -> Vec<Session> {
