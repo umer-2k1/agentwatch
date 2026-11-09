@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use std::collections::HashMap;
 
-use crate::hooks::event::HookEvent;
+use crate::hooks::event::{Decision, HookEvent};
 use crate::liveness::Liveness;
 use crate::model::Session;
 use crate::providers::{claude::ClaudeProvider, Provider};
@@ -22,6 +22,12 @@ pub struct Store {
     last: Vec<Session>,
     /// session id -> why the hook says it is blocked. Authoritative over file inference.
     waiting: HashMap<String, String>,
+    /// session id -> the open channel a `PreToolUse` hook is waiting on.
+    ///
+    /// Dropping the sender closes the helper's connection, which makes it exit with no
+    /// decision — the agent then prompts in its own terminal. That is the correct fallback,
+    /// so "forget it" and "never answer" are the same code path.
+    pending: HashMap<String, std::sync::mpsc::Sender<Decision>>,
 }
 
 /// A provider row for the UI's "what we support" list (D-003 badge).
@@ -49,6 +55,7 @@ impl Store {
             settings: Settings::default(),
             last: Vec::new(),
             waiting: HashMap::new(),
+            pending: HashMap::new(),
         }
     }
 
@@ -65,13 +72,47 @@ impl Store {
     ///
     /// This is the only code path that can produce `needsYou`, which is why it is small and
     /// boring: events either set a reason or clear it.
-    pub fn apply_hook(&mut self, ev: HookEvent) {
+    pub fn apply_hook(
+        &mut self,
+        ev: HookEvent,
+        reply: Option<std::sync::mpsc::Sender<Decision>>,
+    ) {
         let Some(key) = ev.key() else { return };
+
+        // A decision-capable event both marks the session blocked and holds the channel
+        // the answer must travel back on.
+        if ev.wants_decision() {
+            self.waiting.insert(key.clone(), ev.detail());
+            if let Some(tx) = reply {
+                self.pending.insert(key, tx);
+            }
+            return;
+        }
+
         if ev.is_waiting() {
             self.waiting.insert(key, ev.detail());
         } else if ev.clears_waiting() {
             self.waiting.remove(&key);
+            self.pending.remove(&key);
         }
+    }
+
+    /// Answer a blocked turn. Returns false when there was nothing to answer (the helper
+    /// already gave up), so the UI can say so instead of pretending.
+    pub fn answer(&mut self, session_id: &str, decision: Decision) -> bool {
+        let Some(tx) = self.pending.remove(session_id) else {
+            return false;
+        };
+        let sent = tx.send(decision).is_ok();
+        if sent {
+            self.waiting.remove(session_id);
+        }
+        sent
+    }
+
+    /// Sessions currently holding an open decision channel.
+    pub fn awaiting_decision(&self) -> Vec<String> {
+        self.pending.keys().cloned().collect()
     }
 
     pub fn is_waiting(&self, session_id: &str) -> Option<&str> {
@@ -111,6 +152,9 @@ impl Store {
             return; // nothing seen yet this tick; do not wipe real state
         }
         self.waiting.retain(|k, _| live.contains(k));
+        // Dropping the sender closes the hook connection, so a vanished session cannot
+        // leave an agent waiting on a socket nobody will answer.
+        self.pending.retain(|k, _| live.contains(k));
     }
 
     pub fn snapshot(&self) -> Vec<Session> {

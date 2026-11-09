@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use tauri::Emitter;
 
-use hooks::{event::HookEvent, server, settings as hook_settings};
+use hooks::{event::Decision, server, settings as hook_settings, server::Pending};
 use store::{ProviderInfo, SharedStore, Store};
 
 /// Poll cadence. Fast enough that a status change feels instant, cheap because providers
@@ -110,6 +110,29 @@ fn hooks_uninstall() -> Result<bool, String> {
     hook_settings::uninstall(&claude_settings_path())
 }
 
+/// Answer the currently blocked turn for a session.
+#[tauri::command]
+fn answer(store: tauri::State<SharedStore>, session_id: String, decision: String) -> bool {
+    let d = match decision.as_str() {
+        "allow" => Decision::Allow,
+        "deny" => Decision::Deny,
+        _ => Decision::Ask,
+    };
+    store
+        .lock()
+        .map(|mut s| s.answer(&session_id, d))
+        .unwrap_or(false)
+}
+
+/// Which sessions are holding a live decision channel right now.
+#[tauri::command]
+fn awaiting(store: tauri::State<SharedStore>) -> Vec<String> {
+    store
+        .lock()
+        .map(|s| s.awaiting_decision())
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 fn set_idle_after_s(store: tauri::State<SharedStore>, seconds: i64) {
     if let Ok(mut s) = store.lock() {
@@ -129,16 +152,16 @@ pub fn run() {
 
             // Hook events. A failure to listen must never stop the app: the board still
             // works read-only (that is the whole point of having a file layer at all).
-            let (tx, rx) = channel::<HookEvent>();
+            let (tx, rx) = channel::<Pending>();
             match server::spawn(&data_dir(), tx) {
                 Ok(path) => println!("AgentWatch: listening for hooks on {}", path.display()),
                 Err(e) => eprintln!("AgentWatch: hook socket unavailable ({e}); read-only mode"),
             }
             let store_for_events = shared.clone();
             thread::spawn(move || {
-                for ev in rx {
+                for pending in rx {
                     if let Ok(mut s) = store_for_events.lock() {
-                        s.apply_hook(ev);
+                        s.apply_hook(pending.event.clone(), pending.reply);
                     }
                 }
             });
@@ -162,7 +185,9 @@ pub fn run() {
             set_idle_after_s,
             hooks_status,
             hooks_install,
-            hooks_uninstall
+            hooks_uninstall,
+            answer,
+            awaiting
         ])
         .run(tauri::generate_context!())
         .expect("error while running AgentWatch");

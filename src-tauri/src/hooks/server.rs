@@ -47,6 +47,7 @@ pub fn spawn(data_dir: &Path, tx: Sender<Pending>) -> std::io::Result<PathBuf> {
             let Ok(stream) = stream else { continue };
             // One thread per connection: a waiting PreToolUse must not block the next
             // Notification from another agent.
+            let tx = tx.clone();
             thread::spawn(move || handle(stream, tx));
         }
     });

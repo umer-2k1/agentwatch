@@ -106,7 +106,7 @@ fn hook_binary_turns_a_permission_prompt_into_a_needs_you_dot() {
     std::env::set_var("AGENTWATCH_CLAUDE_ROOT", &root);
 
     let mut store = Store::with_window(1);
-    store.apply_hook(ev);
+    store.apply_hook(ev, None);
     let rows = store.tick().to_vec();
 
     println!("status: {:?}", rows.first().map(|s| s.status));
@@ -130,7 +130,7 @@ fn hook_binary_turns_a_permission_prompt_into_a_needs_you_dot() {
         message: None,
         tool_name: None,
     };
-    store.apply_hook(clear);
+    store.apply_hook(clear, None);
     let after = store.tick().to_vec();
     println!("after clear: {:?}", after.first().map(|s| s.status));
     assert_ne!(
@@ -169,4 +169,61 @@ fn payload_to_event_mapping_is_pure() {
     let ev = forward::to_event(PAYLOAD).unwrap();
     assert_eq!(ev.event, "Notification");
     assert!(ev.detail().contains("Bash"));
+}
+
+/// The claim that matters: a `PreToolUse` hook is held open, the user answers in AgentWatch,
+/// and Claude Code receives `permissionDecision: allow` — without a keystroke ever touching
+/// the terminal. Also proves the timeout falls back to "no opinion".
+#[test]
+fn answering_a_pre_tool_use_returns_a_permission_decision() {
+    use agentwatch_lib::hooks::event::Decision;
+    use agentwatch_lib::hooks::server;
+
+    let dir = tmp("answer");
+    let socket = dir.join("events.sock");
+
+    // Play the app: receive the pending event, answer it after a beat.
+    let (tx, rx) = std::sync::mpsc::channel::<server::Pending>();
+    server::spawn(&dir, tx).unwrap();
+
+    let app = thread::spawn(move || {
+        let pending = rx.recv().expect("no pending event");
+        assert!(pending.event.wants_decision(), "PreToolUse must want a decision");
+        let reply = pending.reply.expect("no reply channel");
+        // A short delay, so the helper is genuinely blocked when the answer arrives.
+        thread::sleep(std::time::Duration::from_millis(120));
+        reply.send(Decision::Allow).unwrap();
+    });
+
+    let exe = env!("CARGO_BIN_EXE_agentwatch-hook");
+    let mut child = Command::new(exe)
+        .env("AGENTWATCH_SOCKET", &socket)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn helper");
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(
+            br#"{"hook_event_name":"PreToolUse","session_id":"dec1","tool_name":"Bash",
+                 "message":"Claude wants to run npm test"}"#,
+        )
+        .unwrap();
+
+    let out = child.wait_with_output().unwrap();
+    app.join().unwrap();
+
+    assert!(out.status.success(), "the helper must always exit 0");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    println!("helper printed: {}", stdout.trim());
+
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid hook output");
+    assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "allow");
+    assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+
+    let _ = fs::remove_dir_all(&dir);
 }
