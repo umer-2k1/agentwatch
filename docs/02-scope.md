@@ -44,7 +44,8 @@ Out of scope: hooks, inbox, theming, history, other agents.
 
 ## v1.0 — Everyone (`M1.0`)
 
-- One adapter per agent: Codex, Cursor, Gemini CLI, OpenCode, Copilot, Antigravity, …
+- [x] OpenCode (verified live, SPEC-006)
+- [ ] Codex, Cursor, Gemini CLI, Copilot, Antigravity, …
 - `verified` / `unverified` badge per agent
 - Pre-flight collision API
 

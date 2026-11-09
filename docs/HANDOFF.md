@@ -1,6 +1,6 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-09 (session 4)
+**Last updated:** 2026-11-09 (session 5)
 **Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
@@ -21,6 +21,7 @@
 | Hook helper binary | ✅ `agentwatch-hook`, proven through the real binary |
 | Hook answering | ✅ `permissionDecision` proven both ways |
 | Appearance drawer | ✅ 5 controls, live preview, persisted |
+| OpenCode provider | ✅ **verified live** — 50 real sessions, SPEC-006 |
 | Theming | ❌ M0.3 |
 
 ## Evidence
@@ -151,3 +152,24 @@ Both are recorded in `03-decisions.md`. This is exactly why the live test exists
    of the verified shape).
 2. 2-second undo before the decision is sent.
 3. Edge overlay (M0.1b) · theming persistence to `config.json` · more providers.
+
+---
+
+# Session 5 — a second provider, verified live
+
+## Shipped
+- **OpenCode provider (SPEC-006).** Reads `session_v2` + `session_message`. Because OpenCode
+  stores `time_busy` / `time_idle` as data, `working` vs `done` needs no guessing.
+- **Live test passed**: 50 real sessions read from the running install, including the very
+  session this work was done in, correctly marked `working`.
+- Honest limit recorded: no hooks in OpenCode ⇒ no `needsYou`, no answering, ever.
+
+## Why OpenCode was the right first live test
+No config is written and no hook is installed — the provider only reads a SQLite file. It
+proves the reader/resolver on real data with zero risk to the user's setup.
+
+## Next
+1. Codex provider (`~/.codex/session_index.jsonl` + `sessions/**/rollout-*.jsonl`).
+2. Live verification of the Claude hooks — needs explicit user consent to touch
+   `~/.claude/settings.json`.
+3. Edge overlay · 2s undo · theming persistence.
