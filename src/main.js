@@ -76,8 +76,9 @@ function render(sessions, awaitingIds) {
     .map((k) => `<span><b>${by[k]}</b> ${pretty(k)}</span>`)
     .join("");
 
-  // Dot strip.
+  // Dot strip. Collapsed when empty, so an idle app looks calm instead of broken.
   el.strip.innerHTML = "";
+  el.strip.style.display = sessions.length ? "" : "none";
   for (const s of sessions) {
     const wrap = document.createElement("div");
     wrap.className = "dot-wrap";
@@ -95,7 +96,7 @@ function render(sessions, awaitingIds) {
     el.list.innerHTML = `
       <div class="empty">
         <div class="big">No agents running</div>
-        <div>Start a Claude Code session in any terminal and it appears here.</div>
+        <div>Start Claude Code, Codex or OpenCode and it appears here.</div>
       </div>`;
     return;
   }
