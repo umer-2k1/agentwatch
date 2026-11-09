@@ -188,7 +188,10 @@ fn answering_a_pre_tool_use_returns_a_permission_decision() {
 
     let app = thread::spawn(move || {
         let pending = rx.recv().expect("no pending event");
-        assert!(pending.event.wants_decision(), "PreToolUse must want a decision");
+        assert!(
+            pending.event.wants_decision(),
+            "PreToolUse must want a decision"
+        );
         let reply = pending.reply.expect("no reply channel");
         // A short delay, so the helper is genuinely blocked when the answer arrives.
         thread::sleep(std::time::Duration::from_millis(120));
@@ -260,9 +263,7 @@ fn an_unanswered_hook_falls_back_to_the_terminal_prompt() {
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(
-            br#"{"hook_event_name":"PreToolUse","session_id":"dec2","tool_name":"Bash"}"#,
-        )
+        .write_all(br#"{"hook_event_name":"PreToolUse","session_id":"dec2","tool_name":"Bash"}"#)
         .unwrap();
 
     let out = child.wait_with_output().unwrap();

@@ -72,11 +72,7 @@ impl Store {
     ///
     /// This is the only code path that can produce `needsYou`, which is why it is small and
     /// boring: events either set a reason or clear it.
-    pub fn apply_hook(
-        &mut self,
-        ev: HookEvent,
-        reply: Option<std::sync::mpsc::Sender<Decision>>,
-    ) {
+    pub fn apply_hook(&mut self, ev: HookEvent, reply: Option<std::sync::mpsc::Sender<Decision>>) {
         let Some(key) = ev.key() else { return };
 
         // A decision-capable event both marks the session blocked and holds the channel

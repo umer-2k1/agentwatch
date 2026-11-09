@@ -73,7 +73,10 @@ fn handle(mut stream: std::os::unix::net::UnixStream, tx: Sender<Pending>) {
 
     if !ev.wants_decision() {
         let _ = stream.write_all(b"ok\n");
-        let _ = tx.send(Pending { event: ev, reply: None });
+        let _ = tx.send(Pending {
+            event: ev,
+            reply: None,
+        });
         return;
     }
 
@@ -89,7 +92,9 @@ fn handle(mut stream: std::os::unix::net::UnixStream, tx: Sender<Pending>) {
     }
 
     // Nobody answers => `Ask`, which hands the question back to Claude Code's own prompt.
-    let decision = reply_rx.recv_timeout(DECISION_TIMEOUT).unwrap_or(Decision::Ask);
+    let decision = reply_rx
+        .recv_timeout(DECISION_TIMEOUT)
+        .unwrap_or(Decision::Ask);
     let body = serde_json::json!({ "decision": decision });
     let mut out = body.to_string();
     out.push('\n');

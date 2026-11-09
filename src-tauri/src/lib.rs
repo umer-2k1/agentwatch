@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use tauri::Emitter;
 
-use hooks::{event::Decision, server, settings as hook_settings, server::Pending};
+use hooks::{event::Decision, server, server::Pending, settings as hook_settings};
 use store::{ProviderInfo, SharedStore, Store};
 
 /// Poll cadence. Fast enough that a status change feels instant, cheap because providers
