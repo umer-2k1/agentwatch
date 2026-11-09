@@ -4,7 +4,7 @@
 //! All logic lives in `providers/`, `resolver.rs`, `liveness.rs` and `store.rs`.
 
 mod liveness;
-mod model;
+pub mod model;
 mod providers;
 mod resolver;
 mod store;
@@ -90,6 +90,12 @@ pub fn debug_scan_with_window(hours: i64) -> Vec<DebugRow> {
     let mut store = Store::with_window(hours);
     let snapshot = store.tick().to_vec();
     snapshot.into_iter().map(row_of).collect()
+}
+
+/// Resolve with the app's default settings. Used by integration tests.
+pub fn debug_sessions(hours: i64) -> Vec<model::Session> {
+    let mut store = Store::with_window(hours);
+    store.tick().to_vec()
 }
 
 fn row_of(s: model::Session) -> DebugRow {

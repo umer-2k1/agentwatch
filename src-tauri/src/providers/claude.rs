@@ -346,7 +346,14 @@ fn test_and_env_window() -> i64 {
         .unwrap_or(12)
 }
 
+/// Root of the Claude Code data. Overridable so tests never read or write the real
+/// `~/.claude`, and so a user can point AgentWatch at a different install.
 fn dirs_claude() -> PathBuf {
+    if let Ok(root) = std::env::var("AGENTWATCH_CLAUDE_ROOT") {
+        if !root.is_empty() {
+            return PathBuf::from(root);
+        }
+    }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     PathBuf::from(home).join(".claude")
 }
