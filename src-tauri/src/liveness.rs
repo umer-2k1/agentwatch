@@ -61,7 +61,8 @@ impl Liveness {
             };
         }
         self.refresh_if_stale();
-        match self.by_cwd.get(cwd) {
+        let key = canonical(cwd);
+        match self.by_cwd.get(&key) {
             Some(pid) => {
                 if Self::pid_is_alive(*pid) {
                     LivenessAnswer {
@@ -97,8 +98,20 @@ impl Liveness {
     }
 }
 
-/// Agent binaries we look for. Matched against the process command name.
+/// Agent binaries we look for, matched against the *basename* of the process command.
+///
+/// macOS reports `comm` as a full path (`/tmp/x/claude`, `/Applications/Claude.app/…`), so a
+/// substring match would also catch `Claude Helper`, `chrome_crashpad_handler` and the
+/// desktop app itself. Exact basename match, and `.app/` bundles are excluded.
 const AGENT_COMMS: &[&str] = &["claude", "codex"];
+
+fn is_agent_process(comm: &str) -> bool {
+    if comm.contains(".app/") {
+        return false; // a GUI app, not a CLI session
+    }
+    let base = comm.rsplit('/').next().unwrap_or(comm).to_lowercase();
+    AGENT_COMMS.iter().any(|a| base == *a)
+}
 
 fn scan_agent_processes() -> HashMap<String, i32> {
     let mut out = HashMap::new();
@@ -117,18 +130,29 @@ fn scan_agent_processes() -> HashMap<String, i32> {
         let Ok(pid) = pid_s.trim().parse::<i32>() else {
             continue;
         };
-        let comm_l = comm.to_lowercase();
-        if AGENT_COMMS.iter().any(|a| comm_l.contains(a)) {
+        if is_agent_process(comm.trim()) {
             candidates.push(pid);
         }
     }
 
     for pid in candidates {
         if let Some(cwd) = cwd_of_pid(pid) {
-            out.insert(cwd, pid);
+            // `lsof` reports the resolved path, so both sides go through the same
+            // canonicaliser: `/tmp/x` and `/private/tmp/x` must be the same session.
+            if out.insert(canonical(&cwd), pid).is_some() {
+                // Two sessions in one directory: keep one mapping. Both report alive if
+                // either is (documented limitation until the hook gives us exact pids).
+            }
         }
     }
     out
+}
+
+/// Resolve symlinks so `/tmp` and `/private/tmp` compare equal. Falls back to the input.
+fn canonical(path: &str) -> String {
+    std::fs::canonicalize(path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| path.to_string())
 }
 
 /// Resolve a process's working directory with `lsof`.
@@ -159,6 +183,25 @@ mod tests {
     #[test]
     fn zero_pid_is_not_alive() {
         assert!(!Liveness::pid_is_alive(0));
+    }
+
+    #[test]
+    fn agent_process_matching_is_exact() {
+        assert!(is_agent_process("/tmp/fakeagent/claude"));
+        assert!(is_agent_process("claude"));
+        assert!(is_agent_process("/opt/homebrew/bin/codex"));
+        // must not match:
+        assert!(!is_agent_process("/Applications/Claude.app/Contents/MacOS/Claude"));
+        assert!(!is_agent_process("/Applications/Claude.app/Contents/Frameworks/Claude Helper"));
+        assert!(!is_agent_process("/Applications/Claude.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler"));
+        assert!(!is_agent_process("node"));
+        assert!(!is_agent_process("claude-monitor-helper"));
+    }
+
+    #[test]
+    fn canonical_makes_tmp_paths_equal() {
+        // /tmp and /private/tmp are the same directory on macOS.
+        assert_eq!(canonical("/tmp"), canonical("/private/tmp"));
     }
 
     #[test]
