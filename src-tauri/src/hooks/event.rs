@@ -6,6 +6,37 @@
 
 use serde::{Deserialize, Serialize};
 
+/// What the user decided about a blocked tool call.
+///
+/// `Ask` is the safe default: it hands control back to Claude Code's own terminal prompt,
+/// which is exactly what would have happened if AgentWatch were not running at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Decision {
+    Allow,
+    Deny,
+    Ask,
+}
+
+impl Decision {
+    /// The wire form Claude Code understands for a `PreToolUse` hook.
+    pub fn hook_output(&self) -> Option<serde_json::Value> {
+        let decision = match self {
+            Decision::Allow => "allow",
+            Decision::Deny => "deny",
+            // Emitting nothing is how a hook says "I have no opinion".
+            Decision::Ask => return None,
+        };
+        Some(serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": decision,
+                "permissionDecisionReason": "Answered in AgentWatch"
+            }
+        }))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookEvent {
     /// Claude Code's `hook_event_name`: SessionStart, UserPromptSubmit, PreToolUse,
@@ -38,6 +69,15 @@ impl HookEvent {
             self.event.as_str(),
             "UserPromptSubmit" | "PostToolUse" | "Stop" | "SubagentStop" | "SessionEnd"
         )
+    }
+
+    /// Can this event carry a decision back to the agent?
+    ///
+    /// Only `PreToolUse` can: it is the hook Claude Code blocks on and reads a
+    /// `permissionDecision` from. `Notification` is fire-and-forget, so answering there
+    /// would do nothing.
+    pub fn wants_decision(&self) -> bool {
+        self.event == "PreToolUse"
     }
 
     pub fn detail(&self) -> String {
@@ -98,6 +138,27 @@ mod tests {
     fn missing_message_still_has_a_detail() {
         let e = ev(r#"{"event":"Notification","session_id":"abc"}"#);
         assert_eq!(e.detail(), "waiting for you");
+    }
+
+    #[test]
+    fn only_pre_tool_use_carries_a_decision() {
+        assert!(ev(r#"{"event":"PreToolUse","session_id":"a"}"#).wants_decision());
+        assert!(!ev(r#"{"event":"Notification","session_id":"a"}"#).wants_decision());
+        assert!(!ev(r#"{"event":"Stop","session_id":"a"}"#).wants_decision());
+    }
+
+    #[test]
+    fn allow_and_deny_serialise_for_claude() {
+        let allow = Decision::Allow.hook_output().unwrap();
+        assert_eq!(allow["hookSpecificOutput"]["permissionDecision"], "allow");
+        let deny = Decision::Deny.hook_output().unwrap();
+        assert_eq!(deny["hookSpecificOutput"]["permissionDecision"], "deny");
+    }
+
+    #[test]
+    fn ask_emits_nothing_so_the_terminal_still_prompts() {
+        // The safe default must be indistinguishable from AgentWatch not being installed.
+        assert!(Decision::Ask.hook_output().is_none());
     }
 
     #[test]
