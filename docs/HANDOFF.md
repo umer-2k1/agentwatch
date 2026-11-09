@@ -1,7 +1,7 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-06 (session 1)
-**Milestone:** M0.1 "See" — **shipped to the board, edge overlay still pending**
+**Last updated:** 2026-11-09 (session 2)
+**Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
 ## What exists right now
@@ -15,7 +15,11 @@
 | Store | ✅ one snapshot, urgency sort, provider registry |
 | Board UI | ✅ six states, evidence tooltips, provider badge |
 | Edge overlay | ❌ not built (M0.1b) |
-| Everything else | ❌ v0.2+ |
+| Liveness proof | ✅ **verified end-to-end** — `tests/liveness_live.rs` |
+| Hook installer | ✅ idempotent, backed up, 7 tests |
+| Hook event socket | ✅ listener + event model, 6 tests |
+| Hook answering | ❌ not built — needs the helper binary |
+| Theming | ❌ M0.3 |
 
 ## Evidence
 
@@ -59,3 +63,36 @@ Both are recorded in `03-decisions.md`. This is exactly why the live test exists
 - Claude Code **rewinds** messages, which truncates the file. Handle `size < offset`.
 - JSONL writes are not atomic. Always keep the trailing partial line.
 - Rebuild is fast (~6 s) after the first Tauri compile; the first is ~4 min.
+
+---
+
+# Session 2 (2026-11-09)
+
+## Shipped
+- **`dead` is proven.** `tests/liveness_live.rs` spawns a real process, kills it, and asserts
+  the session flips to `dead` with `certain` confidence and evidence `pid NNNN is gone`.
+- **Sticky pid memory (D-015).** The reason `dead` works at all: we remember the last pid we
+  saw for a directory, because a dead process simply vanishes from the table.
+- **Process matching hardened.** `ps` reports full paths, so `comm` now matches on exact
+  basename and skips `.app/` bundles — otherwise `Claude Helper` and the desktop app would
+  have been treated as agents.
+- **Path canonicalisation.** `lsof` returns `/private/tmp/…` where transcripts say `/tmp/…`.
+- **Hook installer (SPEC-004)** — merge, backup, idempotent, uninstall. 7 tests.
+- **Hook event socket** — `events.sock`, event model, 6 tests. A `Notification` now sets
+  `needsYou` in the store and outranks file inference.
+
+## Traps found this session (worth remembering)
+
+| Trap | Detail |
+|---|---|
+| Copied binaries do not run | a copy of `/bin/sleep` is SIGKILLed instantly (bad signature). **Symlink** it (D-016). |
+| `ps comm` is a full path | substring matching catches `Claude Helper`. Match the basename exactly. |
+| `/tmp` ≠ `/private/tmp` | canonicalise both sides of every path comparison. |
+| Env-var fixtures race | a process-wide env var means parallel integration tests clobber each other. **One test, sequential phases.** |
+| Store lifetime matters | liveness memory lives in the store; recreating it per call silently disables `dead`. |
+
+## Next
+1. `agentwatch-hook` helper binary (reads stdin payload → socket → exit 0).
+2. Answering: helper blocks, app returns a decision, helper prints `hookSpecificOutput`.
+3. Edge overlay (M0.1b).
+4. Theming (M0.3).
