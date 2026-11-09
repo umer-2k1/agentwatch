@@ -1,6 +1,6 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-09 (session 2)
+**Last updated:** 2026-11-09 (session 3)
 **Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
@@ -18,7 +18,9 @@
 | Liveness proof | ✅ **verified end-to-end** — `tests/liveness_live.rs` |
 | Hook installer | ✅ idempotent, backed up, 7 tests |
 | Hook event socket | ✅ listener + event model, 6 tests |
-| Hook answering | ❌ not built — needs the helper binary |
+| Hook helper binary | ✅ `agentwatch-hook`, proven through the real binary |
+| Hook answering | ❌ not built |
+| Appearance drawer | ✅ 5 controls, live preview, persisted |
 | Theming | ❌ M0.3 |
 
 ## Evidence
@@ -96,3 +98,35 @@ Both are recorded in `03-decisions.md`. This is exactly why the live test exists
 2. Answering: helper blocks, app returns a decision, helper prints `hookSpecificOutput`.
 3. Edge overlay (M0.1b).
 4. Theming (M0.3).
+
+---
+
+# Session 3
+
+## Shipped
+- **`agentwatch-hook` helper** — reads Claude's payload on stdin, forwards over the socket,
+  **always exits 0**, 400 ms timeouts. A missing app is invisible to the agent.
+- **Payload normaliser** (`hooks/forward.rs`) — the only file that knows Claude's field
+  names. Tolerates missing fields, ignores garbage, never panics.
+- **Proven pipeline** — `tests/hook_pipeline.rs` runs the *real binary* with a *real payload*
+  over a *real socket* into the *real store*: dot turns amber, `certain`, then clears on
+  `PostToolUse`.
+- **Appearance drawer (SPEC-005)** — appearance, accent, dot shape, density, glass. Live
+  preview, no Apply button. Persisted in `localStorage`.
+
+## Current counts
+45 Rust tests · 6 spec files · 4 ADRs · 18 decisions
+
+## Next
+1. **Answering** — helper blocks, app returns a decision, helper prints `hookSpecificOutput`.
+   This is the last hard piece of M0.2 and the real differentiator.
+2. Inbox list with `1–9` (needs the answer path to be useful).
+3. Edge overlay (M0.1b).
+4. Move `prefs` from localStorage into `config.json` (M0.3b).
+
+## Traps added this session
+| Trap | Detail |
+|---|---|
+| A hook must never fail the agent | every error path returns, `main` exits 0 unconditionally |
+| Missing ack must not block | 400 ms read timeout; the write result is ignored |
+| `localStorage` is per-webview | the overlay window will need the same prefs — move to config before that |
