@@ -12,7 +12,9 @@ use std::collections::HashMap;
 use crate::hooks::event::{Decision, HookEvent};
 use crate::liveness::Liveness;
 use crate::model::Session;
-use crate::providers::{claude::ClaudeProvider, opencode::OpenCodeProvider, Provider};
+use crate::providers::{
+    claude::ClaudeProvider, codex::CodexProvider, opencode::OpenCodeProvider, Provider,
+};
 use crate::resolver::{resolve, Settings};
 
 pub struct Store {
@@ -52,6 +54,7 @@ impl Store {
             // file in providers/ (D-003).
             providers: vec![
                 Box::new(ClaudeProvider::with_window(hours)),
+                Box::new(CodexProvider::new(hours)),
                 Box::new(OpenCodeProvider::new(hours)),
             ],
             liveness: Liveness::new(),
