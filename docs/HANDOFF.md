@@ -1,6 +1,6 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-09 (session 5)
+**Last updated:** 2026-11-10 (session 6)
 **Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
@@ -22,6 +22,8 @@
 | Hook answering | ✅ `permissionDecision` proven both ways |
 | Appearance drawer | ✅ 5 controls, live preview, persisted |
 | OpenCode provider | ✅ **verified live** — 50 real sessions, SPEC-006 |
+| Codex provider | ✅ 7 tests, 170 real sessions parsed |
+| UI: repo-first labels, row detail, thin strip | ✅ (screenshots stale — see trap) |
 | Theming | ❌ M0.3 |
 
 ## Evidence
@@ -173,3 +175,33 @@ proves the reader/resolver on real data with zero risk to the user's setup.
 2. Live verification of the Claude hooks — needs explicit user consent to touch
    `~/.claude/settings.json`.
 3. Edge overlay · 2s undo · theming persistence.
+
+---
+
+# Session 6
+
+## Shipped
+- **Codex provider** — `~/.codex/sessions/**/rollout-*.jsonl`. Signals: `task_started`,
+  `task_complete`, `token_count`, `custom_tool_call(_output)`, `session_meta`.
+  Reading needs **no subscription** — the rollouts are just files.
+- **UI corrections** from reviewing the screenshots:
+  - labels are **repo-first** (6 sessions on 3 repos: "shop-web" identifies a session,
+    "pricing page layout" does not)
+  - the strip is now a thin ambient row of bare dots instead of a duplicate of the list
+  - rows are clickable and expand into a detail panel (status, why, folder, pid, quiet)
+    instead of relying on a tooltip
+
+## Trap found: the screenshot pipeline broke
+Mid-session, `chrome --headless --screenshot=…` began exiting 0 while writing **no file** —
+both stable Chrome 157 and Chrome for Testing. `--dump-dom` also returns empty. No fix
+found yet; the screenshots in `docs/assets/` therefore predate the UI corrections above.
+
+Workaround for whoever picks this up: open the app itself (`npm run tauri dev`) and capture
+the real window, or repair headless Chrome (check for a stale singleton, quarantine on a
+fresh Chrome install, or switch to Playwright's screenshot API).
+
+## Next
+1. Re-shoot `docs/assets/ui-*.png` against the corrected UI.
+2. Jump-to-agent for the terminals we can address (iTerm via tty, tmux, WezTerm, kitty).
+3. 2-second undo before a decision is sent.
+4. Edge overlay (M0.1b) — where the strip finally earns its place.

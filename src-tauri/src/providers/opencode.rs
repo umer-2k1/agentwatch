@@ -145,7 +145,11 @@ fn fact_from_row(r: Row) -> SessionFact {
         branch: String::new(), // OpenCode keeps no branch on the session row
         model: String::new(),
         turn_closed: !working,
-        pending_tool: if working { r.last_tool.clone().or(Some("turn".into())) } else { None },
+        pending_tool: if working {
+            r.last_tool.clone().or(Some("turn".into()))
+        } else {
+            None
+        },
         last_activity_ms: r.time_updated.unwrap_or(0),
         turn_started_ms: r.time_busy,
         cost_usd: None,
@@ -195,14 +199,20 @@ mod tests {
     #[test]
     fn idle_after_busy_is_closed() {
         let f = fact_from_row(row(Some(1_000), Some(2_000), "idle", Some(1_500)));
-        assert!(f.turn_closed, "an idle mark after the busy mark closes the turn");
+        assert!(
+            f.turn_closed,
+            "an idle mark after the busy mark closes the turn"
+        );
         assert!(f.pending_tool.is_none());
     }
 
     #[test]
     fn streaming_assistant_without_completion_is_working() {
         let f = fact_from_row(row(None, Some(1_000), "assistant", None));
-        assert!(!f.turn_closed, "a message that never completed is still streaming");
+        assert!(
+            !f.turn_closed,
+            "a message that never completed is still streaming"
+        );
     }
 
     #[test]

@@ -36,20 +36,34 @@ fn reads_a_real_opencode_install() {
     }
     println!("--- {} OpenCode session(s) ---\n", facts.len());
 
-    assert!(!facts.is_empty(), "no sessions parsed from a populated database");
+    assert!(
+        !facts.is_empty(),
+        "no sessions parsed from a populated database"
+    );
 
     // Every row must be internally consistent: a closed turn has no pending tool.
     for f in &facts {
         if f.turn_closed {
-            assert!(f.pending_tool.is_none(), "closed turn with a pending tool: {:?}", f.title);
+            assert!(
+                f.pending_tool.is_none(),
+                "closed turn with a pending tool: {:?}",
+                f.title
+            );
         }
-        assert!(f.last_activity_ms > 0, "session without a timestamp: {:?}", f.title);
+        assert!(
+            f.last_activity_ms > 0,
+            "session without a timestamp: {:?}",
+            f.title
+        );
         assert_eq!(f.provider, "opencode");
     }
 
     // The resolver must agree with the provider's own facts.
     let resolved = agentwatch_lib::debug_sessions(24 * 30);
-    let oc: Vec<_> = resolved.iter().filter(|s| s.fact.provider == "opencode").collect();
+    let oc: Vec<_> = resolved
+        .iter()
+        .filter(|s| s.fact.provider == "opencode")
+        .collect();
     println!("resolved {} OpenCode session(s)", oc.len());
     for s in oc.iter().take(8) {
         println!(

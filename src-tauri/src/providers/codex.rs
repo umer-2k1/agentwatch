@@ -47,14 +47,16 @@ impl CodexProvider {
 
     fn discover(&self) -> Vec<PathBuf> {
         let mut out = Vec::new();
-        let cutoff = std::time::SystemTime::now()
-            - std::time::Duration::from_secs(self.window_s as u64);
+        let cutoff =
+            std::time::SystemTime::now() - std::time::Duration::from_secs(self.window_s as u64);
         walk(&self.root, cutoff, &mut out, 0);
         out
     }
 
     fn advance(&mut self, path: &Path) {
-        let Ok(meta) = std::fs::metadata(path) else { return };
+        let Ok(meta) = std::fs::metadata(path) else {
+            return;
+        };
         let size = meta.len();
         let state = self.files.entry(path.to_path_buf()).or_default();
 
@@ -67,7 +69,9 @@ impl CodexProvider {
         }
 
         use std::io::{Read, Seek, SeekFrom};
-        let Ok(mut f) = std::fs::File::open(path) else { return };
+        let Ok(mut f) = std::fs::File::open(path) else {
+            return;
+        };
         if f.seek(SeekFrom::Start(state.offset)).is_err() {
             return;
         }
@@ -140,7 +144,9 @@ fn walk(dir: &Path, cutoff: std::time::SystemTime, out: &mut Vec<PathBuf>, depth
     if depth > 5 {
         return;
     }
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let p = e.path();
         let Ok(md) = e.metadata() else { continue };
@@ -261,7 +267,12 @@ mod tests {
     #[test]
     fn session_meta_sets_identity_and_repo() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"session_meta","payload":{"session_id":"01abc","cwd":"/Users/me/code/shop-api"}}"#));
+        apply(
+            &mut f,
+            &v(
+                r#"{"type":"session_meta","payload":{"session_id":"01abc","cwd":"/Users/me/code/shop-api"}}"#,
+            ),
+        );
         assert_eq!(f.id, "codex:01abc");
         assert_eq!(f.repo, "shop-api");
     }
@@ -269,7 +280,12 @@ mod tests {
     #[test]
     fn task_started_opens_a_turn() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"event_msg","timestamp":"2026-11-09T10:00:00Z","payload":{"type":"task_started"}}"#));
+        apply(
+            &mut f,
+            &v(
+                r#"{"type":"event_msg","timestamp":"2026-11-09T10:00:00Z","payload":{"type":"task_started"}}"#,
+            ),
+        );
         assert!(!f.turn_closed);
         assert_eq!(f.pending_tool.as_deref(), Some("turn"));
         assert!(f.turn_started_ms.is_some());
@@ -278,8 +294,14 @@ mod tests {
     #[test]
     fn task_complete_closes_it() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"event_msg","payload":{"type":"task_started"}}"#));
-        apply(&mut f, &v(r#"{"type":"event_msg","payload":{"type":"task_complete"}}"#));
+        apply(
+            &mut f,
+            &v(r#"{"type":"event_msg","payload":{"type":"task_started"}}"#),
+        );
+        apply(
+            &mut f,
+            &v(r#"{"type":"event_msg","payload":{"type":"task_complete"}}"#),
+        );
         assert!(f.turn_closed);
         assert!(f.pending_tool.is_none());
         assert!(f.turn_started_ms.is_none());
@@ -288,16 +310,27 @@ mod tests {
     #[test]
     fn tool_call_and_output_track_pending() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"response_item","payload":{"type":"custom_tool_call","name":"shell"}}"#));
+        apply(
+            &mut f,
+            &v(r#"{"type":"response_item","payload":{"type":"custom_tool_call","name":"shell"}}"#),
+        );
         assert_eq!(f.pending_tool.as_deref(), Some("shell"));
-        apply(&mut f, &v(r#"{"type":"response_item","payload":{"type":"custom_tool_call_output"}}"#));
+        apply(
+            &mut f,
+            &v(r#"{"type":"response_item","payload":{"type":"custom_tool_call_output"}}"#),
+        );
         assert!(f.pending_tool.is_none());
     }
 
     #[test]
     fn token_count_is_recorded() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":20}}}}"#));
+        apply(
+            &mut f,
+            &v(
+                r#"{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":20}}}}"#,
+            ),
+        );
         assert_eq!(f.tokens_in, 100);
         assert_eq!(f.tokens_out, 20);
     }
@@ -305,7 +338,12 @@ mod tests {
     #[test]
     fn assistant_message_becomes_a_title() {
         let mut f = SessionFact::default();
-        apply(&mut f, &v(r#"{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Fixed the flaky login test"}]}}"#));
+        apply(
+            &mut f,
+            &v(
+                r#"{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Fixed the flaky login test"}]}}"#,
+            ),
+        );
         assert_eq!(f.title, "Fixed the flaky login test");
     }
 
