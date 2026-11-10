@@ -318,7 +318,7 @@ function wireKeys() {
   });
 
   document.getElementById("list").addEventListener("click", (e) => {
-    const row = e.target.closest(".row");
+    const row = e.target.closest(".card");
     if (row && !e.target.closest("button")) {
       const d = row.querySelector(".detail");
       if (d) d.hidden = !d.hidden;

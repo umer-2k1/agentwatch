@@ -172,43 +172,104 @@ body {
   background: var(--brand, var(--brand-default));
 }
 
-/* ---- list ---- */
-.list { flex: 1; overflow-y: auto; padding: 7px 8px; }
-.row {
-  display: grid;
-  grid-template-columns: 9px 1fr auto;
-  gap: 11px;
-  align-items: center;
-  padding: var(--row-pad) 11px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-}
-.row:hover {
-  background: var(--panel-hover);
-  border-color: var(--line);
-  backdrop-filter: blur(var(--blur-amount));
-}
-.row .mini {
-  width: 9px; height: 9px; border-radius: 50%;
-  border-width: 1.5px;
-}
-.row .title { font-weight: 570; font-size: 13px; }
-.row .meta {
-  color: var(--text-faint); font-size: 11.5px; margin-top: 2px;
-  display: flex; gap: 9px; flex-wrap: wrap;
-}
-.row .meta span { white-space: nowrap; }
+/* ---- list: grouped cards ---- */
+.list { flex: 1; overflow-y: auto; padding: 14px 14px 20px; }
 
-.pill {
-  font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
-  letter-spacing: .01em; white-space: nowrap;
+.group { margin-bottom: 18px; }
+.group-head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 6px 7px;
+  color: var(--text-dim);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .02em;
 }
-.pill.working  { color: var(--working);   background: color-mix(in srgb, var(--working) 16%, transparent); }
-.pill.needsYou { color: var(--needs-you); background: color-mix(in srgb, var(--needs-you) 17%, transparent); }
-.pill.done     { color: var(--done);      background: color-mix(in srgb, var(--done) 15%, transparent); }
-.pill.idle     { color: var(--text-dim);  background: color-mix(in srgb, var(--idle) 16%, transparent); }
-.pill.dead     { color: var(--dead);      background: color-mix(in srgb, var(--dead) 17%, transparent); }
-.pill.unknown  { color: var(--text-dim);  background: color-mix(in srgb, var(--unknown) 14%, transparent); }
+.group-head svg { opacity: .6; }
+.gcount {
+  margin-left: 2px; padding: 0 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  color: var(--text-faint);
+  font-size: 10px; font-weight: 600;
+}
+
+.card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 14px;
+  margin-bottom: 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(var(--blur-amount)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--blur-amount)) saturate(160%);
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+
+/* state tints — the card itself carries the urgency, not just a pill */
+.card.needsYou {
+  background: color-mix(in srgb, var(--needs-you) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--needs-you) 42%, var(--line));
+}
+.card.dead {
+  background: color-mix(in srgb, var(--dead) 10%, var(--panel));
+  border-color: color-mix(in srgb, var(--dead) 38%, var(--line));
+}
+.card.idle, .card.unknown { opacity: .78; }
+
+.card-body { flex: 1; min-width: 0; }
+.card-title {
+  font-weight: 570; font-size: 13.5px;
+  letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card-meta {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  margin-top: 4px;
+  color: var(--text-faint); font-size: 11.5px;
+}
+.card-meta .m { white-space: nowrap; }
+
+.card-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  flex: none;
+}
+.card-right .t {
+  color: var(--text-faint); font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-actions { display: flex; gap: 7px; margin-top: 10px; }
+.card-actions button {
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--panel-solid) 60%, transparent);
+  color: var(--text);
+}
+.card-actions button[data-allow]:hover {
+  border-color: color-mix(in srgb, var(--done) 60%, var(--line));
+  background: color-mix(in srgb, var(--done) 20%, transparent);
+  color: var(--done);
+}
+.card-actions button[data-deny]:hover {
+  border-color: color-mix(in srgb, var(--dead) 60%, var(--line));
+  background: color-mix(in srgb, var(--dead) 18%, transparent);
+  color: var(--dead);
+}
+
+.card .detail {
+  margin-top: 10px; padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--line) 40%, transparent);
+  font-size: 11.5px; color: var(--text-dim);
+  display: grid; gap: 3px;
+}
+.card .detail[hidden] { display: none; }
+.card .detail .k {
+  display: inline-block; min-width: 52px;
+  color: var(--text-faint); font-weight: 550;
+}
 
 /* ---- empty ---- */
 .empty {
