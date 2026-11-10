@@ -44,7 +44,15 @@ let latest = [];
 let awaiting = new Set();
 
 function label(s) {
-  return s.title || s.repo || "Claude Code";
+  // Repo first: with 6 sessions on 3 repos, "shop-web" identifies a session and
+  // "pricing page layout" does not. The title becomes the second line.
+  return s.repo || s.title || s.provider || "Agent";
+}
+
+function subtitleTitle(s) {
+  const t = s.title && s.title !== label(s) ? s.title : "";
+  const meta = [s.branch, s.model].filter(Boolean).join(" · ");
+  return [t, meta].filter(Boolean).join(" — ");
 }
 
 function subtitle(s) {
@@ -78,15 +86,13 @@ function render(sessions, awaitingIds) {
 
   // Dot strip. Collapsed when empty, so an idle app looks calm instead of broken.
   el.strip.innerHTML = "";
-  el.strip.style.display = sessions.length ? "" : "none";
   for (const s of sessions) {
     const wrap = document.createElement("div");
     wrap.className = "dot-wrap";
     const prov = providerOf(s);
     wrap.title = `${label(s)} — ${pretty(s.status)} · ${prov.label}${s.confidence !== "certain" ? ` (${s.confidence})` : ""}\n${s.evidence?.detail || ""}`;
     wrap.innerHTML = `
-      <span class="dot ${s.status} p-${prov.short}" aria-label="${pretty(s.status)}, ${prov.label}"></span>
-      <span class="dot-label">${escapeHtml(label(s))}</span>`;
+      <span class="dot ${s.status} p-${prov.short}" aria-label="${pretty(s.status)}, ${prov.label}"></span>`;
     el.strip.appendChild(wrap);
   }
 
@@ -104,7 +110,8 @@ function render(sessions, awaitingIds) {
   for (const s of sessions) {
     const row = document.createElement("div");
     row.className = "row";
-    row.title = s.evidence?.detail || "";
+    row.dataset.id = s.id;
+    row.classList.add("clickable");
     const prov = providerOf(s);
     row.innerHTML = `
       <span class="mini dot ${s.status} p-${prov.short}" style="width:7px;height:7px;box-shadow:none"></span>
@@ -112,7 +119,7 @@ function render(sessions, awaitingIds) {
         <div class="title">${escapeHtml(label(s))}</div>
         <div class="meta">
           <span class="chip p-${prov.short}">${escapeHtml(prov.label)}</span>
-          <span>${escapeHtml(subtitle(s))}</span>
+          <span>${escapeHtml(subtitleTitle(s))}</span>
           <span>${quiet(s)}</span>
           ${s.pid ? `<span>pid ${s.pid}</span>` : ""}
         </div>
@@ -123,6 +130,12 @@ function render(sessions, awaitingIds) {
             ? `<span class="answer-keys"><button data-allow="${s.id}">1 Allow</button><button data-deny="${s.id}">2 Deny</button></span>`
             : `<span class="pill ${s.status}">${pretty(s.status)}${s.confidence === "unknown" ? " ?" : ""}</span>`
         }
+      </div>
+      <div class="detail" hidden>
+        <div><span class="k">status</span> ${pretty(s.status)} · ${s.confidence}</div>
+        <div><span class="k">why</span> ${escapeHtml(s.evidence?.detail || "—")}</div>
+        <div><span class="k">folder</span> ${escapeHtml(s.cwd || "—")}</div>
+        <div><span class="k">pid</span> ${s.pid ?? "unknown"} · <span class="k">quiet</span> ${quiet(s)}</div>
       </div>`;
     el.list.appendChild(row);
   }
@@ -276,6 +289,12 @@ function wireKeys() {
   });
 
   document.getElementById("list").addEventListener("click", (e) => {
+    const row = e.target.closest(".row");
+    if (row && !e.target.closest("button")) {
+      const d = row.querySelector(".detail");
+      if (d) d.hidden = !d.hidden;
+      return;
+    }
     const allow = e.target.closest("button[data-allow]");
     const deny = e.target.closest("button[data-deny]");
     if (allow) decide(allow.dataset.allow, "allow");

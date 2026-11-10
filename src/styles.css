@@ -105,14 +105,16 @@ body {
 /* ---- dot strip ---- */
 .strip {
   display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 26px 18px 22px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
   overflow-x: auto;
-  min-height: 104px;
   border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  min-height: 0;
 }
-.dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; width: 72px; }
+.strip:empty { display: none; }
+.dot-wrap { display: flex; align-items: center; }
 .dot {
   width: var(--dot-w); height: var(--dot); border-radius: var(--dot-radius);
   /* brand owns the ring, status owns the fill (D-014) */
@@ -340,4 +342,23 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
   border-color: color-mix(in srgb, var(--dead) 60%, var(--line));
   background: color-mix(in srgb, var(--dead) 16%, transparent);
   color: var(--dead);
+}
+
+/* ---- row detail (replaces the tooltip) ---- */
+.row.clickable { cursor: pointer; }
+.row .detail {
+  grid-column: 2 / 4;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  display: grid;
+  gap: 3px;
+}
+.row .detail[hidden] { display: none; }
+.row .detail .k {
+  display: inline-block; min-width: 52px;
+  color: var(--text-faint); font-weight: 550;
 }
