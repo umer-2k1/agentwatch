@@ -124,6 +124,18 @@ fn answer(store: tauri::State<SharedStore>, session_id: String, decision: String
         .unwrap_or(false)
 }
 
+/// Take back an answer that is still inside its undo window.
+#[tauri::command]
+fn undo_answer(store: tauri::State<SharedStore>, session_id: String) -> bool {
+    store.lock().map(|mut s| s.undo(&session_id)).unwrap_or(false)
+}
+
+/// Sessions whose answer can still be cancelled.
+#[tauri::command]
+fn undoable(store: tauri::State<SharedStore>) -> Vec<String> {
+    store.lock().map(|s| s.undoable()).unwrap_or_default()
+}
+
 /// Which sessions are holding a live decision channel right now.
 #[tauri::command]
 fn awaiting(store: tauri::State<SharedStore>) -> Vec<String> {
@@ -187,6 +199,8 @@ pub fn run() {
             hooks_install,
             hooks_uninstall,
             answer,
+            undo_answer,
+            undoable,
             awaiting
         ])
         .run(tauri::generate_context!())

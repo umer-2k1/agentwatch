@@ -96,7 +96,7 @@ function render(sessions, awaitingIds) {
     el.strip.appendChild(wrap);
   }
 
-  // List.
+  // List — AgentDock-style: grouped by repository, one card per agent.
   el.list.innerHTML = "";
   if (!sessions.length) {
     el.list.innerHTML = `
@@ -107,37 +107,66 @@ function render(sessions, awaitingIds) {
     return;
   }
 
+  // Group by repo, keeping urgency order inside each group.
+  const groups = new Map();
   for (const s of sessions) {
-    const row = document.createElement("div");
-    row.className = "row";
-    row.dataset.id = s.id;
-    row.classList.add("clickable");
-    const prov = providerOf(s);
-    row.innerHTML = `
-      <span class="mini dot ${s.status} p-${prov.short}" style="width:7px;height:7px;box-shadow:none"></span>
-      <div>
-        <div class="title">${escapeHtml(label(s))}</div>
-        <div class="meta">
-          <span class="chip p-${prov.short}">${escapeHtml(prov.label)}</span>
-          <span>${escapeHtml(subtitleTitle(s))}</span>
-          <span>${quiet(s)}</span>
-          ${s.pid ? `<span>pid ${s.pid}</span>` : ""}
+    const key = s.repo || "other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+
+  for (const [repo, items] of groups) {
+    const g = document.createElement("section");
+    g.className = "group";
+
+    const head = document.createElement("div");
+    head.className = "group-head";
+    head.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      </svg>
+      <span>${escapeHtml(repo)}</span>
+      <span class="gcount">${items.length}</span>`;
+    g.appendChild(head);
+
+    for (const s of items) {
+      const prov = providerOf(s);
+      const card = document.createElement("div");
+      card.className = `card ${s.status} p-${prov.short}`;
+      card.dataset.id = s.id;
+
+      const isAwaiting = awaiting.has(s.id);
+      card.innerHTML = `
+        <div class="card-body">
+          <div class="card-title">${escapeHtml(s.title || s.repo)}</div>
+          <div class="card-meta">
+            <span class="chip p-${prov.short}">${escapeHtml(prov.label)}</span>
+            ${s.branch ? `<span class="m">${escapeHtml(s.branch)}</span>` : ""}
+            ${s.model ? `<span class="m">${escapeHtml(s.model)}</span>` : ""}
+            <span class="m">${quiet(s)}</span>
+          </div>
+          ${
+            isAwaiting
+              ? `<div class="card-actions">
+                   <button data-allow="${s.id}">1 Allow</button>
+                   <button data-deny="${s.id}">2 Deny</button>
+                 </div>`
+              : ""
+          }
+          <div class="detail" hidden>
+            <div><span class="k">status</span> ${pretty(s.status)} · ${s.confidence}</div>
+            <div><span class="k">why</span> ${escapeHtml(s.evidence?.detail || "—")}</div>
+            <div><span class="k">folder</span> ${escapeHtml(s.cwd || "—")}</div>
+            <div><span class="k">pid</span> ${s.pid ?? "unknown"}</div>
+          </div>
         </div>
-      </div>
-      <div class="right">
-        ${
-          awaiting.has(s.id)
-            ? `<span class="answer-keys"><button data-allow="${s.id}">1 Allow</button><button data-deny="${s.id}">2 Deny</button></span>`
-            : `<span class="pill ${s.status}">${pretty(s.status)}${s.confidence === "unknown" ? " ?" : ""}</span>`
-        }
-      </div>
-      <div class="detail" hidden>
-        <div><span class="k">status</span> ${pretty(s.status)} · ${s.confidence}</div>
-        <div><span class="k">why</span> ${escapeHtml(s.evidence?.detail || "—")}</div>
-        <div><span class="k">folder</span> ${escapeHtml(s.cwd || "—")}</div>
-        <div><span class="k">pid</span> ${s.pid ?? "unknown"} · <span class="k">quiet</span> ${quiet(s)}</div>
-      </div>`;
-    el.list.appendChild(row);
+        <div class="card-right">
+          <span class="t">${fmtAge(s.quietForS)}</span>
+          <span class="dot ${s.status} p-${prov.short}"></span>
+        </div>`;
+      g.appendChild(card);
+    }
+    el.list.appendChild(g);
   }
 }
 

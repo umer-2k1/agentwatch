@@ -24,6 +24,8 @@ pub struct Store {
     last: Vec<Session>,
     /// session id -> why the hook says it is blocked. Authoritative over file inference.
     waiting: HashMap<String, String>,
+    /// session id -> cancellation flag for an answer that is still inside its undo window.
+    undo: HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// session id -> the open channel a `PreToolUse` hook is waiting on.
     ///
     /// Dropping the sender closes the helper's connection, which makes it exit with no
@@ -61,6 +63,7 @@ impl Store {
             settings: Settings::default(),
             last: Vec::new(),
             waiting: HashMap::new(),
+            undo: HashMap::new(),
             pending: HashMap::new(),
         }
     }
@@ -99,17 +102,53 @@ impl Store {
         }
     }
 
-    /// Answer a blocked turn. Returns false when there was nothing to answer (the helper
-    /// already gave up), so the UI can say so instead of pretending.
+    /// Answer a blocked turn, but do not send it yet.
+    ///
+    /// The decision sits in an undo window (default 2 s) before it reaches the agent. Typing
+    /// "yes" into someone else's live terminal is irreversible, so the pause is the safety
+    /// net, not a nicety.
+    ///
+    /// Returns false when there is nothing to answer (the helper already gave up), so the
+    /// UI can say so instead of pretending.
     pub fn answer(&mut self, session_id: &str, decision: Decision) -> bool {
         let Some(tx) = self.pending.remove(session_id) else {
             return false;
         };
-        let sent = tx.send(decision).is_ok();
-        if sent {
-            self.waiting.remove(session_id);
+        let key = session_id.to_string();
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.undo.insert(key.clone(), cancel.clone());
+
+        let window = undo_window();
+        std::thread::spawn(move || {
+            std::thread::sleep(window);
+            if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+                return; // undone: dropping `tx` closes the hook, agent prompts normally
+            }
+            let _ = tx.send(decision);
+        });
+        true
+    }
+
+    /// Cancel an answer that has not been sent yet.
+    pub fn undo(&mut self, session_id: &str) -> bool {
+        match self.undo.remove(session_id) {
+            Some(flag) => {
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                // Restore the blocked state, since nothing was sent.
+                true
+            }
+            None => false,
         }
-        sent
+    }
+
+    /// Is this session inside its undo window right now?
+    pub fn is_undoable(&self, session_id: &str) -> bool {
+        self.undo.contains_key(session_id)
+    }
+
+    /// Sessions whose answer can still be taken back.
+    pub fn undoable(&self) -> Vec<String> {
+        self.undo.keys().cloned().collect()
     }
 
     /// Sessions currently holding an open decision channel.
@@ -157,6 +196,7 @@ impl Store {
         // Dropping the sender closes the hook connection, so a vanished session cannot
         // leave an agent waiting on a socket nobody will answer.
         self.pending.retain(|k, _| live.contains(k));
+        self.undo.retain(|k, _| live.contains(k));
     }
 
     pub fn snapshot(&self) -> Vec<Session> {
@@ -178,6 +218,15 @@ impl Store {
             })
             .collect()
     }
+}
+
+/// How long an answer can be taken back.
+fn undo_window() -> std::time::Duration {
+    let ms = std::env::var("AGENTWATCH_UNDO_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(2000);
+    std::time::Duration::from_millis(ms)
 }
 
 pub type SharedStore = Arc<Mutex<Store>>;
