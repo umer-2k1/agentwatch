@@ -127,7 +127,10 @@ fn answer(store: tauri::State<SharedStore>, session_id: String, decision: String
 /// Take back an answer that is still inside its undo window.
 #[tauri::command]
 fn undo_answer(store: tauri::State<SharedStore>, session_id: String) -> bool {
-    store.lock().map(|mut s| s.undo(&session_id)).unwrap_or(false)
+    store
+        .lock()
+        .map(|mut s| s.undo(&session_id))
+        .unwrap_or(false)
 }
 
 /// Sessions whose answer can still be cancelled.
