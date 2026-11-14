@@ -67,3 +67,32 @@ supports it; the frontend binds it in M0.3.)*
 - Contrast: light mode uses the light-appearance status palette (D-019) to stay ≥ 4.5:1.
 - No information is conveyed by animation alone; the amber pulse is decoration, the word
   "needs you" is the signal.
+
+---
+
+## The gap that mattered (recorded after a failed attempt)
+
+First implementation used **one bordered card per agent**. The user's reaction was that it
+looked like a prototype. Comparing against AgentDock directly, the difference was structural,
+not cosmetic:
+
+| | Bordered cards (wrong) | One panel (right) |
+|---|---|---|
+| Container | one box per agent | **one** glass surface for the whole list |
+| Separation | 6 px gaps | **hairlines** (`border-white/[0.045]`) |
+| Grouping | group title above boxes | group title **inside** the panel |
+| Attention | full amber border on the card | **2 px accent bar** at the left edge + 6 % tint |
+| Status | grey pill on the right | **coloured word inline** with the meta |
+| Vendor | coloured square | **glyph** (asterisk / hexagon / braces) |
+| Rhythm | each card floats | rows share a baseline grid |
+
+Rules derived from this:
+
+1. **A list is one object.** Cards are for independent items (search results); a live board is
+   a list, and a list is a single surface.
+2. **Attention is shown at the edge**, never by drawing a full border — the accent bar reads
+   without shouting.
+3. **Status is a word with a colour**, not a coloured chip with a word. The word is the
+   signal; colour reinforces it and survives nothing else.
+4. **Meta is one line with hairline separators** (`needs you · shop-web · feature/pricing ·
+   claude-opus-5`), not stacked labels.
