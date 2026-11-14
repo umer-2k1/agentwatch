@@ -246,3 +246,27 @@ pnpm tauri build    # .app + .dmg
 2. Jump-to-agent from a card.
 3. 2-second undo with a visible countdown.
 4. Verify the tray visually with a real agent running.
+
+---
+
+## Menu-bar debugging (session 8) — read this before touching the tray
+
+Four separate failures looked like one bug. Recorded so they are not rediscovered:
+
+1. **The status item never appeared.** Cause: the app was launched from a background shell
+   (`./agentwatch &`). A raw binary started that way does not get a status item; the item
+   only registers for a properly activated `.app` bundle launched with `open -a`.
+2. **Swapping a binary inside `.app` breaks it.** `cp target/debug/agentwatch
+   AgentWatch.app/Contents/MacOS/` invalidates the code signature and LaunchServices then
+   refuses with `kLSNoExecutableErr`. **Never patch a bundle — rebuild it.**
+3. **An empty tray label hides the item.** With `title("")` and an icon macOS declined to
+   draw, the item has zero width and is invisible. The title is therefore **never empty**:
+   the needs-you count, or `·` when idle.
+4. **The menu closed as soon as it opened.** `update()` rebuilt the menu on every 500 ms
+   tick, and replacing an open menu dismisses it. Fixed by fingerprinting the content and
+   rebuilding only on change (`TrayState::signature`).
+
+**Still open:** `TrayIconBuilder::icon()` does not render on this machine (macOS 26,
+Tauri 2.12) — tested with a raw RGBA buffer, a bundled PNG, template and non-template, and
+builder-vs-`set_icon`. The count title is what guarantees a visible, useful item. Revisit
+with a minimal Tauri repro before trying again.

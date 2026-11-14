@@ -233,3 +233,13 @@ the only thing on screen; the window is where you read and answer.
 `#0a84ff` on white is ~2.1:1 contrast. Light mode therefore maps to `#0071e3 / #a85600 /
 #1a7f37 / #d70015`, and every row still carries a text label so colour is never the only
 signal.
+
+## D-020 — The tray title is never empty
+
+An NSStatusItem whose image fails to draw and whose title is empty is **invisible and
+unclickable** — the app looks dead. The title is therefore always present: the number of
+agents needing attention, or `·` when none do. This is also better product: the count is
+readable at a glance without opening anything.
+
+**Consequence.** Even if the icon renders later, the title stays. It is the guarantee, not a
+fallback.

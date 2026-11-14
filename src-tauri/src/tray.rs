@@ -9,38 +9,30 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, Emitter, Manager};
 
-/// A 22×24 menu-bar icon: three dots, amber · blue · green, on a transparent plate.
+/// A 34×22 menu-bar icon: three status dots, amber · blue · green.
 ///
-/// Generated rather than shipped as a file, so the colours stay tied to the status model.
+/// Drawn at 2× and downsampled by macOS, so the edges stay clean at 16 pt. Colours are the
+/// same tokens the board uses; a monochrome template would lose the whole point.
+/// The menu-bar mark: a PNG of the app icon's 2×2 status motif at 44 px (22 pt @2×).
+///
+/// Shipped as a real PNG file rather than a hand-built RGBA buffer: the buffer was created
+/// successfully but never rendered by macOS, and a decoded PNG is the reliable path.
 fn tray_image() -> tauri::image::Image<'static> {
-    let (w, h) = (22usize, 24usize);
-    let mut rgba = vec![0u8; w * h * 4];
+    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
+        .expect("bundled tray.png must decode")
+}
 
-    // dot radius 4, centred vertically at 12
-    let dots: [(usize, [u8; 3]); 3] = [
-        (5, [0xff, 0x9f, 0x0a]), // needs you
-        (11, [0x0a, 0x84, 0xff]), // working
-        (17, [0x30, 0xd1, 0x58]), // done
-    ];
-    for (cx, color) in dots {
-        for y in 0..h {
-            for x in 0..w {
-                let dx = (x as i32 - cx as i32).abs();
-                let dy = (y as i32 - 12).abs();
-                if dx <= 3 && dy <= 3 {
-                    // anti-aliased edge
-                    let d = (dx.max(dy)) as f32;
-                    let a = (1.0 - (d - 2.5).clamp(0.0, 1.0)) * 255.0;
-                    let i = (y * w + x) * 4;
-                    rgba[i] = color[0];
-                    rgba[i + 1] = color[1];
-                    rgba[i + 2] = color[2];
-                    rgba[i + 3] = a as u8;
-                }
-            }
-        }
+/// Menu-bar title. Never empty — an empty title plus an icon that macOS declines to draw
+/// leaves an invisible status item, which is exactly the bug we hit.
+fn title_for(sessions: &[Session]) -> String {
+    let (need, _, total) = counts(sessions);
+    if total == 0 {
+        return "·".into();
     }
-    tauri::image::Image::new_owned(rgba, w as u32, h as u32)
+    if need > 0 {
+        return need.to_string();
+    }
+    "·".into()
 }
 
 fn counts(sessions: &[Session]) -> (usize, usize, usize) {
@@ -117,6 +109,11 @@ fn menu(app: &AppHandle, sessions: &[Session]) -> tauri::Result<Menu<tauri::Wry>
 
 pub struct TrayState {
     pub tray: TrayIcon<tauri::Wry>,
+    /// Signature of the menu currently installed.
+    ///
+    /// Rebuilding the menu while it is open **closes it instantly** — that was the
+    /// "tray opens and disappears" bug. We only rebuild when the content really changed.
+    pub signature: std::sync::Mutex<String>,
 }
 
 /// Create the tray. Call once in `setup`.
@@ -124,7 +121,7 @@ pub fn build(app: &AppHandle, sessions: &[Session]) -> tauri::Result<()> {
     let m = menu(app, sessions)?;
 
     let tray = TrayIconBuilder::with_id("main")
-        .icon(tray_image())
+        .title(title_for(sessions))
         .menu(&m)
         .show_menu_on_left_click(true)
         .tooltip("AgentWatch")
@@ -133,15 +130,46 @@ pub fn build(app: &AppHandle, sessions: &[Session]) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    app.manage(TrayState { tray });
+    // Builder-supplied icons never rendered on this macOS build; setting it after
+    // construction does.
+    if let Err(e) = tray.set_icon(Some(tray_image())) {
+        eprintln!("AgentWatch: set_icon failed: {e}");
+    }
+
+    app.manage(TrayState {
+        tray,
+        signature: std::sync::Mutex::new(signature(sessions)),
+    });
     Ok(())
 }
 
-/// Refresh the menu with a new snapshot.
+/// A cheap fingerprint of everything the menu displays.
+fn signature(sessions: &[Session]) -> String {
+    let (n, w, t) = counts(sessions);
+    let mut s = format!("{n}|{w}|{t}");
+    for x in sessions.iter().take(12) {
+        s.push('|');
+        s.push_str(&x.fact.id);
+        s.push(':');
+        s.push_str(x.status.as_str());
+        s.push(':');
+        s.push_str(&x.fact.repo);
+    }
+    s
+}
+
+/// Refresh the menu — but only when something visibly changed.
 pub fn update(app: &AppHandle, sessions: &[Session]) {
     let Some(state) = app.try_state::<TrayState>() else { return };
+    let next = signature(sessions);
+    let Ok(mut current) = state.signature.lock() else { return };
+    if *current == next {
+        return;
+    }
     if let Ok(m) = menu(app, sessions) {
         let _ = state.tray.set_menu(Some(m));
+        let _ = state.tray.set_title(Some(title_for(sessions)));
+        *current = next;
     }
 }
 

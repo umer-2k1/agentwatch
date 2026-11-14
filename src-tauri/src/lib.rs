@@ -169,7 +169,10 @@ pub fn run() {
             // Menu-bar presence first: the app must exist even with the window closed.
             if let Ok(mut st) = shared.lock() {
                 let snap = st.tick().to_vec();
-                let _ = tray::build(&handle, &snap);
+                match tray::build(&handle, &snap) {
+                    Ok(()) => eprintln!("AgentWatch: tray created"),
+                    Err(e) => eprintln!("AgentWatch: TRAY FAILED: {e}"),
+                }
             }
 
             app.on_menu_event(|app, event| tray::on_menu_event(app, event));
