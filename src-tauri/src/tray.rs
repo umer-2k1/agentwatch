@@ -6,7 +6,7 @@
 
 use crate::model::{Session, Status};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder};
+use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// A 22×24 menu-bar icon: three dots, amber · blue · green, on a transparent plate.
