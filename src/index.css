@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------- *
+ * Design tokens.
+ *
+ * Status colours are Apple's system colours, matched to AgentDock.
+ * Light mode uses the *light* variants because #0a84ff on white is
+ * unreadable (2.1:1); see D-017.
+ * ---------------------------------------------------------------- */
+@layer base {
+  :root {
+    --background: 240 14% 96%;
+    --foreground: 240 6% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+    --primary: 211 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 92%;
+    --muted-foreground: 240 4% 42%;
+    --accent: 211 100% 45%;
+    --accent-foreground: 0 0% 100%;
+    --border: 240 6% 88%;
+    --input: 240 6% 88%;
+    --ring: 211 100% 45%;
+    --radius: 0.75rem;
+
+    --status-working: 211 100% 45%;
+    --status-needs-you: 30 100% 33%;
+    --status-done: 135 62% 30%;
+    --status-idle: 240 2% 52%;
+    --status-dead: 357 100% 42%;
+    --status-unknown: 240 2% 52%;
+
+    --brand-claude: 14 62% 60%;
+    --brand-codex: 167 83% 35%;
+    --brand-opencode: 35 91% 55%;
+    --brand-cursor: 240 3% 78%;
+    --brand-gemini: 250 90% 73%;
+    --brand-copilot: 262 72% 62%;
+  }
+
+  .dark {
+    --background: 240 14% 4%;
+    --foreground: 240 11% 96%;
+    --card: 228 12% 8%;
+    --card-foreground: 240 11% 96%;
+    --popover: 228 12% 9%;
+    --popover-foreground: 240 11% 96%;
+    --primary: 211 100% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 10% 14%;
+    --secondary-foreground: 240 11% 96%;
+    --muted: 228 10% 13%;
+    --muted-foreground: 240 5% 63%;
+    --accent: 211 100% 52%;
+    --accent-foreground: 0 0% 100%;
+    --border: 228 10% 16%;
+    --input: 228 10% 18%;
+    --ring: 211 100% 52%;
+
+    --status-working: 211 100% 52%;
+    --status-needs-you: 36 100% 52%;
+    --status-done: 135 71% 50%;
+    --status-idle: 240 2% 57%;
+    --status-dead: 2 100% 61%;
+    --status-unknown: 240 2% 57%;
+
+    --brand-claude: 14 62% 60%;
+    --brand-codex: 167 83% 42%;
+    --brand-opencode: 35 91% 55%;
+    --brand-cursor: 240 3% 78%;
+    --brand-gemini: 250 90% 73%;
+    --brand-copilot: 262 72% 68%;
+  }
+
+  * { @apply border-border; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground font-sans text-[13px];
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background: hsl(var(--border));
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer utilities {
+  /* ambient wash behind the glass — the thing that makes it feel like a Mac app */
+  .app-canvas {
+    background:
+      radial-gradient(70% 55% at 12% 0%, hsl(var(--status-needs-you) / 0.055) 0%, transparent 62%),
+      radial-gradient(65% 55% at 88% 100%, hsl(var(--status-working) / 0.06) 0%, transparent 62%),
+      hsl(var(--background));
+  }
+  .glass {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+  }
+  .status-dot { @apply rounded-full; box-shadow: 0 0 0 2px hsl(var(--brand, var(--border))); }
+}
