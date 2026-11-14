@@ -87,19 +87,26 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3.5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {sessions.length === 0 ? (
               <EmptyState />
             ) : (
-              groups.map(([repo, items]) => (
-                <GroupSection
-                  key={repo}
-                  repo={repo}
-                  sessions={items}
-                  awaiting={awaiting}
-                  onAnswer={handleAnswer}
+              <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-card/55 shadow-[0_18px_50px_-24px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+                <SectionLabel
+                  label="Now"
+                  count={sessions.filter((s) => s.status === "working" || s.status === "needsYou").length}
                 />
-              ))
+                {groups.map(([repo, items], i) => (
+                  <GroupSection
+                    key={repo}
+                    repo={repo}
+                    sessions={items}
+                    awaiting={awaiting}
+                    onAnswer={handleAnswer}
+                    first={i === 0}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -130,6 +137,17 @@ export default function App() {
           open={settingsOpen}
         />
       </div>
+    </div>
+  );
+}
+
+function SectionLabel({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-white/[0.05] px-4 py-2">
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60">
+        {label}
+      </span>
+      <span className="text-[10px] text-muted-foreground/40">{count}</span>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { Folder } from "lucide-react";
-import { SessionCard } from "./SessionCard";
+import { SessionRow } from "./SessionRow";
 import type { Session } from "@/lib/types";
 
 export function GroupSection({
@@ -7,29 +7,33 @@ export function GroupSection({
   sessions,
   awaiting,
   onAnswer,
+  first,
 }: {
   repo: string;
   sessions: Session[];
   awaiting: Set<string>;
   onAnswer: (id: string, d: "allow" | "deny") => void;
+  first?: boolean;
 }) {
   return (
-    <section className="mb-4">
-      <div className="mb-1.5 flex items-center gap-1.5 px-1.5 text-[11px] font-semibold text-muted-foreground">
-        <Folder className="h-3 w-3 opacity-60" />
-        <span>{repo}</span>
-        <span className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground/80">
-          {sessions.length}
+    <div className={first ? "" : "mt-1"}>
+      <div className="flex items-center gap-1.5 px-4 py-1.5">
+        <Folder className="h-2.5 w-2.5 text-muted-foreground/50" />
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+          {repo}
         </span>
+        <span className="text-[10px] text-muted-foreground/40">{sessions.length}</span>
       </div>
-      {sessions.map((s) => (
-        <SessionCard
-          key={s.id}
-          session={s}
-          awaiting={awaiting.has(s.id)}
-          onAnswer={onAnswer}
-        />
-      ))}
-    </section>
+      <div>
+        {sessions.map((s) => (
+          <SessionRow
+            key={s.id}
+            session={s}
+            awaiting={awaiting.has(s.id)}
+            onAnswer={onAnswer}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
