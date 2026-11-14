@@ -337,13 +337,14 @@ fn apply_line(fact: &mut SessionFact, v: &Value) {
     }
 }
 
-/// Hours of history the board considers "live". Default 12.
+/// Hours of history the board considers "live". Default 48 — a weekend gap should
+/// not make the board look empty on a Monday.
 #[allow(dead_code)]
 fn test_and_env_window() -> i64 {
     std::env::var("AGENTWATCH_ACTIVE_WINDOW_HOURS")
         .ok()
         .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(12)
+        .unwrap_or(48)
 }
 
 /// Root of the Claude Code data. Overridable so tests never read or write the real

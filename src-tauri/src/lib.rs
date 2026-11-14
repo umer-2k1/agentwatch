@@ -9,6 +9,7 @@ pub mod model;
 pub mod providers;
 mod resolver;
 pub mod store;
+mod tray;
 
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
@@ -16,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 use hooks::{event::Decision, server, server::Pending, settings as hook_settings};
 use store::{ProviderInfo, SharedStore, Store};
@@ -165,6 +166,14 @@ pub fn run() {
             let handle = app.handle().clone();
             let store = shared.clone();
 
+            // Menu-bar presence first: the app must exist even with the window closed.
+            if let Ok(mut st) = shared.lock() {
+                let snap = st.tick().to_vec();
+                let _ = tray::build(&handle, &snap);
+            }
+
+            app.on_menu_event(|app, event| tray::on_menu_event(app, event));
+
             // Hook events. A failure to listen must never stop the app: the board still
             // works read-only (that is the whole point of having a file layer at all).
             let (tx, rx) = channel::<Pending>();
@@ -190,8 +199,21 @@ pub fn run() {
                     Err(_) => continue,
                 };
                 let _ = handle.emit("sessions", &snapshot);
+                tray::update(&handle, &snapshot);
             });
 
+            let window = app.get_webview_window("main");
+            if let Some(w) = window {
+                let w2 = w.clone();
+                w.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // Closing the window must not close the product: the tray is the
+                        // app. Hide instead, like every menu-bar utility.
+                        api.prevent_close();
+                        let _ = w2.hide();
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -221,7 +243,7 @@ pub struct DebugRow {
 
 /// Scan with the app's default window (12h).
 pub fn debug_scan() -> Vec<DebugRow> {
-    debug_scan_with_window(12)
+    debug_scan_with_window(48)
 }
 
 /// Scan with an explicit window in hours. The live test uses a wide window because a

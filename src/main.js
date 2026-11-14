@@ -101,8 +101,9 @@ function render(sessions, awaitingIds) {
   if (!sessions.length) {
     el.list.innerHTML = `
       <div class="empty">
-        <div class="big">No agents running</div>
-        <div>Start Claude Code, Codex or OpenCode and it appears here.</div>
+        <div class="big">No agents active in the last 48h</div>
+        <div>Start Claude Code, Codex or OpenCode and it appears here.<br/>
+             Older sessions are hidden — <code>AGENTWATCH_ACTIVE_WINDOW_HOURS</code> widens the window.</div>
       </div>`;
     return;
   }

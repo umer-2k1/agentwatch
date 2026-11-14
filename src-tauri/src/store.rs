@@ -46,7 +46,7 @@ pub struct ProviderInfo {
 
 impl Store {
     pub fn new() -> Self {
-        Self::with_window(12)
+        Self::with_window(48)
     }
 
     /// `hours` of transcript history that counts as live.
