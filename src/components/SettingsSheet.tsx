@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,7 @@ export function SettingsSheet({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="border-t border-border/60 py-3 first:border-t-0 first:pt-0">
       <div className="mb-2 text-[11px] text-muted-foreground">{label}</div>
