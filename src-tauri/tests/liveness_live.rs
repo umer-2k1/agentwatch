@@ -97,6 +97,15 @@ fn tick(store: &mut Store) -> Vec<agentwatch_lib::model::Session> {
     store.tick().to_vec()
 }
 
+/// The fixture's own session.
+///
+/// The store polls **every** provider, so the snapshot also contains the developer's real
+/// OpenCode and Codex sessions. Selecting by id is the only correct way to assert about the
+/// fixture — `first()` silently picked a real session once those providers landed.
+fn fixture_session(rows: &[agentwatch_lib::model::Session]) -> Option<&agentwatch_lib::model::Session> {
+    rows.iter().find(|s| s.fact.id == "claude-code:test-session")
+}
+
 #[test]
 fn liveness_end_to_end() {
     // ---- Phase 1: alive + open turn => working -------------------------------
@@ -106,21 +115,15 @@ fn liveness_end_to_end() {
     let mut child = fx.spawn_agent();
 
     let live = tick(&mut store);
-    println!(
-        "alive  -> {:?} (pid {:?})",
-        live.iter().map(|s| s.status).collect::<Vec<_>>(),
-        live.iter().map(|s| s.pid).collect::<Vec<_>>()
-    );
+    let mine = fixture_session(&live).expect("fixture session missing from the snapshot");
+    println!("alive  -> {:?} pid={:?}", mine.status, mine.pid);
 
     assert_eq!(
-        live.first().map(|s| s.status),
-        Some(Status::Working),
+        mine.status,
+        Status::Working,
         "a live agent with an open turn must be `working`"
     );
-    assert!(
-        live.first().and_then(|s| s.pid).is_some(),
-        "liveness must bind the session to a pid"
-    );
+    assert!(mine.pid.is_some(), "liveness must bind the session to a pid");
 
     // ---- Phase 2: killed => dead, within one tick ----------------------------
     child.kill().unwrap();
@@ -128,23 +131,16 @@ fn liveness_end_to_end() {
     thread::sleep(Duration::from_millis(300));
 
     let after = tick(&mut store);
-    println!(
-        "killed -> {:?} ({} )",
-        after.iter().map(|s| s.status).collect::<Vec<_>>(),
-        after
-            .first()
-            .map(|s| s.evidence.detail.clone())
-            .unwrap_or_default()
-    );
+    let mine = fixture_session(&after).expect("fixture session missing after kill");
+    println!("killed -> {:?} ({})", mine.status, mine.evidence.detail);
 
     assert_eq!(
-        after.first().map(|s| s.status),
-        Some(Status::Dead),
+        mine.status,
+        Status::Dead,
         "a killed agent must resolve to `dead`, not `working` or `idle`"
     );
-    // A process fact, not a guess.
     assert_eq!(
-        format!("{:?}", after[0].confidence).to_lowercase(),
+        format!("{:?}", mine.confidence).to_lowercase(),
         "certain",
         "death must be `certain`, never `inferred`"
     );
@@ -157,13 +153,12 @@ fn liveness_end_to_end() {
 
     let mut store2 = Store::with_window(1);
     let rows = tick(&mut store2);
-    println!(
-        "noproc -> {:?}",
-        rows.iter().map(|s| s.status).collect::<Vec<_>>()
-    );
+    let mine = fixture_session(&rows).expect("fixture session missing (noproc)");
+    println!("noproc -> {:?}", mine.status);
 
-    assert!(
-        rows.iter().all(|s| s.status != Status::Dead),
+    assert_ne!(
+        mine.status,
+        Status::Dead,
         "without having observed a process we must never assert death"
     );
 }
