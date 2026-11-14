@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/Header";
-import { DotRail } from "@/components/DotRail";
 import { GroupSection } from "@/components/GroupSection";
 import { SettingsSheet, type Prefs } from "@/components/SettingsSheet";
 import { STATUS_ORDER, type ProviderInfo, type Session } from "@/lib/types";
@@ -88,8 +87,6 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          <DotRail sessions={sessions} />
-
           <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3.5">
             {sessions.length === 0 ? (
               <EmptyState />
