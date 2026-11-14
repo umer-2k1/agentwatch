@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Every coding agent, one watch."
 authors = ["umer-2k1"]
 edition = "2021"
+default-run = "agentwatch"
 
 [lib]
 name = "agentwatch_lib"
