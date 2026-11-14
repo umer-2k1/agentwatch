@@ -1,5 +1,9 @@
 # UI tour
 
+> **Session 7:** the frontend was rebuilt on Vite + React + Tailwind + shadcn (D-017).
+> The screenshots below are from that stack; earlier vanilla captures are superseded.
+
+
 Every screenshot here is the **real frontend** (`src/index.html`, `styles.css`, `main.js`)
 rendered in headless Chrome with a mocked Tauri bridge. No design mockups — what you see is
 what ships.
