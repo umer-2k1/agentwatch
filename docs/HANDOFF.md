@@ -1,6 +1,6 @@
 # Handoff — current state
 
-**Last updated:** 2026-11-10 (session 6)
+**Last updated:** 2026-11-14 (session 7)
 **Milestone:** M0.1 complete except the edge overlay · M0.2 (hooks) started
 **Build status:** ✅ compiling, 18 unit tests + 1 live test passing, app launches
 
@@ -205,3 +205,44 @@ fresh Chrome install, or switch to Playwright's screenshot API).
 2. Jump-to-agent for the terminals we can address (iTerm via tty, tmux, WezTerm, kitty).
 3. 2-second undo before a decision is sent.
 4. Edge overlay (M0.1b) — where the strip finally earns its place.
+
+---
+
+# Session 7 — UI rebuilt on a real stack
+
+## Shipped
+- **Frontend replaced.** Vite + React + TS + Tailwind + shadcn primitives (D-017). The
+  vanilla `main.js`/`styles.css` pair is deleted.
+- **Design tokens** in `src/index.css`: status colours, brand colours, glass utilities,
+  light/dark. One place to change appearance.
+- **Components**: `Header`, `SessionCard` (answer actions + expandable evidence),
+  `GroupSection`, `SettingsSheet`, `StatusDot`.
+- **Settings**: theme, accent, corner radius, glass — live, persisted in `localStorage`.
+- **Menu bar** (`src-tauri/src/tray.rs`): dot icon, per-agent menu, counts in the title,
+  close-hides-window instead of quitting.
+- **New app icon**: four status dots on a dark squircle, generated from SVG
+  (`docs/assets/logo.png`), exported to `.icns` + `.ico`.
+- **pnpm** throughout; global rules written to `~/.config/opencode/AGENTS.md`.
+
+## How to run
+```bash
+pnpm dev            # UI only, with fixtures — for design work
+pnpm tauri dev      # the real app, real sessions
+pnpm tauri build    # .app + .dmg
+```
+
+## Traps
+| Trap | Detail |
+|---|---|
+| TypeScript 7 removed `baseUrl` | use `paths` relative to the tsconfig |
+| Vite config `__dirname` | use `import.meta.dirname` |
+| CSS side-effect import | needs `/// <reference types="vite/client" />` |
+| Tauri needs `devUrl` + `beforeDevCommand` | otherwise it looks for a static dir |
+| `default-run` in Cargo.toml | required once lib and bin diverge |
+| Bundle id ending in `.app` | tauri refuses; use `com.agentwatch.desktop` |
+
+## Next
+1. Edge overlay (M0.1b) — the dot rail lives here, floating, non-activating.
+2. Jump-to-agent from a card.
+3. 2-second undo with a visible countdown.
+4. Verify the tray visually with a real agent running.

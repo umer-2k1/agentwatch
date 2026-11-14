@@ -202,3 +202,34 @@ SIGKILLs it (`poll()` returns `-9`). The test then "passed" for the wrong reason
 
 **Decision.** Symlink `/bin/sleep` instead. The original signature is preserved, and `ps`
 still reports the path as `…/claude`, which is what the scanner matches.
+
+## D-017 — The UI is a component system, not hand-written CSS
+
+**Context.** v0.1 shipped as a vanilla Tauri template with ~600 lines of hand-rolled CSS.
+It worked, but it looked like a prototype next to AgentDock, and every change was a new
+class name and a new guess. The user called it out, correctly.
+
+**Decision.** Vite + React + TypeScript + Tailwind + shadcn/ui.
+
+**Why.** shadcn gives accessible, unstyled-by-default primitives (button, switch, slider,
+tabs) that we own the source of, so we get AgentDock's density and polish without inventing
+it. Tailwind makes the design tokens the only source of truth; there is no place for a
+stray hex value to hide.
+
+**Cost we accept.** A build step (Vite) and ~270 KB of JS (85 KB gzipped) that the vanilla
+version did not need. Justified: the UI *is* the product, and the alternative was more
+hand-written CSS.
+
+**Superseded:** the vanilla `src/main.js` + `src/styles.css` pair is gone.
+
+## D-018 — Two surfaces with clearly different jobs
+
+The dot rail inside the window duplicated the list, one card per agent, twice. It has been
+removed from the window. Dots belong to the **ambient edge overlay** (M0.1b), where they are
+the only thing on screen; the window is where you read and answer.
+
+## D-019 — Light mode uses light-appearance status colours
+
+`#0a84ff` on white is ~2.1:1 contrast. Light mode therefore maps to `#0071e3 / #a85600 /
+#1a7f37 / #d70015`, and every row still carries a text label so colour is never the only
+signal.
