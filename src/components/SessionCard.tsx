@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronRight, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "./StatusDot";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function SessionCard({
       onClick={() => setOpen((o) => !o)}
       onKeyDown={(e) => e.key === "Enter" && setOpen((o) => !o)}
       className={cn(
-        "group mb-1.5 cursor-pointer rounded-lg border px-3.5 py-3 transition-all",
+        "group mb-1.5 cursor-pointer rounded-lg border px-3 py-2.5 transition-all",
         "bg-card/70 backdrop-blur-xl hover:-translate-y-px hover:border-border",
         s.status === "needsYou" && "border-status-needsYou/40 bg-status-needsYou/[0.10]",
         s.status === "dead" && "border-status-dead/35 bg-status-dead/[0.08]",
@@ -53,7 +53,9 @@ export function SessionCard({
             </span>
             {s.branch && <span>{s.branch}</span>}
             {s.model && <span>{s.model}</span>}
-            <span>{s.status === "working" && s.turnAgeS != null ? `${age(s.turnAgeS)} in turn` : `${age(s.quietForS)} ago`}</span>
+            {s.status === "working" && s.turnAgeS != null && (
+              <span className="text-status-working/90">{age(s.turnAgeS)} in turn</span>
+            )}
           </div>
 
           {awaiting && (
@@ -96,12 +98,6 @@ export function SessionCard({
             {age(s.quietForS)}
           </span>
           <StatusDot status={s.status} brand={v.className} size="md" />
-          <ChevronRight
-            className={cn(
-              "h-3 w-3 text-muted-foreground/40 transition-transform",
-              open && "rotate-90"
-            )}
-          />
         </div>
       </div>
     </div>

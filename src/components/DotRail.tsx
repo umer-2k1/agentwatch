@@ -5,11 +5,11 @@ import { vendorOf, type Session } from "@/lib/types";
 export function DotRail({ sessions }: { sessions: Session[] }) {
   if (!sessions.length) return null;
   return (
-    <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto border-b px-3.5 py-2">
+    <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto border-b border-border/60 px-3.5 py-2">
       {sessions.map((s) => {
         const v = vendorOf(s.provider);
         return (
-          <span key={s.id} title={`${s.repo || s.title} — ${s.status}`}>
+          <span key={s.id} className="shrink-0 transition-transform hover:scale-125" title={`${s.repo || s.title} — ${s.status}`}>
             <StatusDot status={s.status} brand={v.className} size="md" />
           </span>
         );

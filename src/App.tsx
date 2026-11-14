@@ -65,7 +65,12 @@ export default function App() {
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
-    return [...map.entries()];
+    // A group inherits the urgency of its most urgent agent, so "needs you" repos
+    // float to the top instead of appearing in filesystem order.
+    return [...map.entries()].sort((a, b) => {
+      const rank = (items: Session[]) => Math.min(...items.map((i) => STATUS_ORDER.indexOf(i.status)));
+      return rank(a[1]) - rank(b[1]);
+    });
   }, [sessions]);
 
   async function handleAnswer(id: string, decision: "allow" | "deny") {
