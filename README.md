@@ -60,8 +60,8 @@ theming and history are in the milestone plan.
 ## Develop
 
 ```bash
-npm install
-npm run tauri dev          # app
+pnpm install
+pnpm tauri dev          # app
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml --test live_scan -- --ignored --nocapture
 ```

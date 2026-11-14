@@ -196,7 +196,7 @@ Mid-session, `chrome --headless --screenshot=…` began exiting 0 while writing 
 both stable Chrome 157 and Chrome for Testing. `--dump-dom` also returns empty. No fix
 found yet; the screenshots in `docs/assets/` therefore predate the UI corrections above.
 
-Workaround for whoever picks this up: open the app itself (`npm run tauri dev`) and capture
+Workaround for whoever picks this up: open the app itself (`pnpm tauri dev`) and capture
 the real window, or repair headless Chrome (check for a stale singleton, quarantine on a
 fresh Chrome install, or switch to Playwright's screenshot API).
 
