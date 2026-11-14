@@ -109,3 +109,13 @@
   }
   .status-dot { @apply rounded-full; box-shadow: 0 0 0 2px hsl(var(--brand, var(--border))); }
 }
+
+@layer utilities {
+  /* vendor modifier: sets the ring colour on a dot */
+  .brand-claude { --brand: var(--brand-claude); }
+  .brand-codex { --brand: var(--brand-codex); }
+  .brand-opencode { --brand: var(--brand-opencode); }
+  .brand-cursor { --brand: var(--brand-cursor); }
+  .brand-gemini { --brand: var(--brand-gemini); }
+  .brand-copilot { --brand: var(--brand-copilot); }
+}
