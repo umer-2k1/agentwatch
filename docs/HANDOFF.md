@@ -270,3 +270,18 @@ Four separate failures looked like one bug. Recorded so they are not rediscovere
 Tauri 2.12) — tested with a raw RGBA buffer, a bundled PNG, template and non-template, and
 builder-vs-`set_icon`. The count title is what guarantees a visible, useful item. Revisit
 with a minimal Tauri repro before trying again.
+
+### Tray resolved (verified 2026-11-17)
+
+The status item **is** working. It sits immediately left of the system icons (Siri, Wi-Fi,
+battery), not at the far right — which is why several screenshots that cropped only the last
+200 px appeared to show nothing. Verified from a 2× screenshot of the full menu bar:
+the item draws as the 2×2 status motif (amber · blue · green · dashed ring) plus a `·`
+count marker.
+
+Remaining trap for the next agent: **the menu bar is 2× Retina**. `screencapture -R` takes
+logical points, so a 2560 px capture is 1280 points. Cropping by pixel offsets silently
+lands in the wrong place.
+
+Still true: an empty title makes the item invisible (D-020), and the app must be launched
+as a bundle — a raw binary from a shell never registers a status item.
