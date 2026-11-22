@@ -234,13 +234,44 @@ fn apply_line(fact: &mut SessionFact, v: &Value) {
         }
     }
 
-    // Subagents update liveness but never status (SPEC-001).
+    if let Some(ep) = v.get("entrypoint").and_then(|s| s.as_str()) {
+        if ep.contains("desktop") || ep.contains("app") {
+            fact.place = "Claude app".into();
+        } else if fact.place.is_empty() {
+            fact.place = "Terminal".into();
+        }
+    } else if fact.place.is_empty() {
+        fact.place = "Terminal".into();
+    }
+
+    // Subagents update liveness and subagent tree but never parent status (SPEC-001).
     let side = v
         .get("isSidechain")
         .and_then(|s| s.as_bool())
         .unwrap_or(false);
     if side {
         fact.is_sidechain = false; // the file itself is the parent session
+        if ty == "assistant" {
+            let sid = v
+                .get("uuid")
+                .and_then(|s| s.as_str())
+                .unwrap_or("subagent")
+                .to_string();
+            let title = v
+                .get("slug")
+                .and_then(|s| s.as_str())
+                .unwrap_or("Subagent task")
+                .to_string();
+            if !fact.subagents.iter().any(|s| s.title == title) && fact.subagents.len() < 8 {
+                fact.subagents.push(crate::model::SubagentInfo {
+                    id: sid,
+                    kind: "Helper".into(),
+                    title,
+                    status: "working".into(),
+                    elapsed_s: 12,
+                });
+            }
+        }
         return;
     }
 
@@ -262,15 +293,58 @@ fn apply_line(fact: &mut SessionFact, v: &Value) {
                 if let Some(n) = u.get("output_tokens").and_then(|n| n.as_u64()) {
                     fact.tokens_out = n;
                 }
+                if let Some(n) = u.get("cache_read_input_tokens").and_then(|n| n.as_u64()) {
+                    fact.cache_read_tokens = n;
+                }
+                if let Some(n) = u.get("cache_creation_input_tokens").and_then(|n| n.as_u64()) {
+                    fact.cache_write_tokens = n;
+                }
             }
 
             let mut has_open_tool = false;
             if let Some(blocks) = msg.get("content").and_then(|c| c.as_array()) {
                 for b in blocks {
-                    if b.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                    let bty = b.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    if bty == "text" {
+                        if let Some(txt) = b.get("text").and_then(|t| t.as_str()) {
+                            let trimmed = txt.trim();
+                            if !trimmed.is_empty() {
+                                fact.last_words = trimmed.chars().take(240).collect();
+                                let low = trimmed.to_lowercase();
+                                if low.contains("login expired") || low.contains("please run /login") {
+                                    fact.error_kind = Some("auth".into());
+                                } else if low.contains("insufficient balance") {
+                                    fact.error_kind = Some("balance".into());
+                                } else if low.contains("rate limit") {
+                                    fact.error_kind = Some("rate_limit".into());
+                                } else {
+                                    fact.error_kind = None;
+                                }
+                            }
+                        }
+                    } else if bty == "tool_use" {
                         if let Some(id) = b.get("id").and_then(|s| s.as_str()) {
                             fact.pending_tool = Some(id.to_string());
                             has_open_tool = true;
+                        }
+                        let tname = b.get("name").and_then(|s| s.as_str()).unwrap_or("");
+                        if matches!(tname, "Edit" | "MultiEdit" | "Write" | "NotebookEdit") {
+                            let fp = b
+                                .get("input")
+                                .and_then(|inp| {
+                                    inp.get("file_path")
+                                        .or_else(|| inp.get("path"))
+                                        .and_then(|s| s.as_str())
+                                })
+                                .unwrap_or("");
+                            if !fp.is_empty() {
+                                fact.edited_files.retain(|e| e.path != fp);
+                                fact.edited_files.push(crate::model::FileEdit {
+                                    path: fp.to_string(),
+                                    at_ms: fact.last_activity_ms,
+                                    tool: tname.to_string(),
+                                });
+                            }
                         }
                     }
                 }
@@ -448,5 +522,26 @@ mod tests {
             &line(r#"{"type":"cost-state","totalCostUSD":1.2345}"#),
         );
         assert_eq!(f.cost_usd, Some(1.2345));
+    }
+
+    #[test]
+    fn edit_tool_records_edited_file_path() {
+        let mut f = SessionFact::default();
+        apply_line(
+            &mut f,
+            &line(r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/x/app/src/auth.rs"}}]}}"#),
+        );
+        assert_eq!(f.edited_files.len(), 1);
+        assert_eq!(f.edited_files[0].path, "/x/app/src/auth.rs");
+    }
+
+    #[test]
+    fn login_expired_sets_auth_error_kind() {
+        let mut f = SessionFact::default();
+        apply_line(
+            &mut f,
+            &line(r#"{"type":"assistant","timestamp":"2026-11-06T10:00:00Z","message":{"stop_reason":"end_turn","content":[{"type":"text","text":"Login expired · Please run /login"}]}}"#),
+        );
+        assert_eq!(f.error_kind.as_deref(), Some("auth"));
     }
 }
