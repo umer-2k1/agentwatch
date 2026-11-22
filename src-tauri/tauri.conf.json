@@ -15,10 +15,10 @@
       {
         "label": "main",
         "title": "AgentWatch",
-        "width": 980,
-        "height": 672,
-        "minWidth": 720,
-        "minHeight": 460,
+        "width": 1100,
+        "height": 740,
+        "minWidth": 880,
+        "minHeight": 560,
         "resizable": true,
         "center": true,
         "titleBarStyle": "Transparent",
@@ -27,8 +27,8 @@
       {
         "label": "strip",
         "url": "strip.html",
-        "width": 44,
-        "height": 600,
+        "width": 28,
+        "height": 180,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
@@ -40,7 +40,8 @@
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,
