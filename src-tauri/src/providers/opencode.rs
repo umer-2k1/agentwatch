@@ -40,6 +40,8 @@ struct Row {
     last_completed: Option<i64>,
     #[serde(default)]
     last_tool: Option<String>,
+    #[serde(default)]
+    last_model: Option<String>,
 }
 
 pub struct OpenCodeProvider {
@@ -80,7 +82,10 @@ impl OpenCodeProvider {
                     (SELECT json_extract(m.data, '$.tool') FROM session_message m
                        WHERE m.session_id = s.id AND m.type = 'assistant'
                          AND json_extract(m.data, '$.time.completed') IS NULL
-                       ORDER BY m.seq DESC LIMIT 1) AS last_tool
+                       ORDER BY m.seq DESC LIMIT 1) AS last_tool,
+                    (SELECT json_extract(m.data, '$.model.id') FROM session_message m
+                       WHERE m.session_id = s.id AND m.type = 'assistant'
+                       ORDER BY m.seq DESC LIMIT 1) AS last_model
                FROM session_v2 s
               WHERE s.time_updated >= {since}
                 AND s.time_archived IS NULL
@@ -142,8 +147,8 @@ fn fact_from_row(r: Row) -> SessionFact {
         title: r.title.unwrap_or_else(|| repo.replace('-', " ")),
         cwd,
         repo,
-        branch: String::new(), // OpenCode keeps no branch on the session row
-        model: String::new(),
+        branch: String::new(),
+        model: r.last_model.unwrap_or_default(),
         turn_closed: !working,
         pending_tool: if working {
             r.last_tool.clone().or(Some("turn".into()))
@@ -188,6 +193,7 @@ mod tests {
             last_type: Some(last.into()),
             last_completed: completed,
             last_tool: None,
+            last_model: Some("gemini-4-argon".into()),
         }
     }
 

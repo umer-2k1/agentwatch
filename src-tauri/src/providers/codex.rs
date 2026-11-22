@@ -189,6 +189,12 @@ fn apply(fact: &mut SessionFact, v: &Value) {
                     .unwrap_or("")
                     .to_string();
             }
+            let src = payload.get("source").and_then(|s| s.as_str()).unwrap_or("");
+            fact.place = if src == "app" {
+                "Codex app".into()
+            } else {
+                "Terminal".into()
+            };
         }
         "event_msg" => match pty {
             "task_started" => {
@@ -200,6 +206,12 @@ fn apply(fact: &mut SessionFact, v: &Value) {
                 fact.turn_closed = true;
                 fact.pending_tool = None;
                 fact.turn_started_ms = None;
+                if let Some(msg) = payload.get("last_agent_message").and_then(|s| s.as_str()) {
+                    let trimmed = msg.trim();
+                    if !trimmed.is_empty() {
+                        fact.last_words = trimmed.chars().take(240).collect();
+                    }
+                }
             }
             "token_count" => {
                 if let Some(u) = payload.get("info").and_then(|i| i.get("total_token_usage")) {
@@ -208,6 +220,9 @@ fn apply(fact: &mut SessionFact, v: &Value) {
                     }
                     if let Some(n) = u.get("output_tokens").and_then(|n| n.as_u64()) {
                         fact.tokens_out = n;
+                    }
+                    if let Some(n) = u.get("cached_input_tokens").and_then(|n| n.as_u64()) {
+                        fact.cache_read_tokens = n;
                     }
                 }
             }
