@@ -203,7 +203,7 @@ function Card({
     <div
       onClick={onSelect}
       className={cn(
-        "mb-2.5 cursor-pointer rounded-[18px] border px-4 py-3.5 transition-all",
+        "mb-2 cursor-pointer rounded-[16px] border px-3.5 py-3 transition-all",
         "border-white/[0.07] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.055]",
         selected && "border-primary/50",
         c.cardType === "permission" &&
@@ -300,13 +300,14 @@ function Card({
 
       {/* elsewhere / error actions */}
       {(c.cardType === "elsewhere" || isError) && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onJump(c.place, c.repo); }}>
+        <div className="mt-2.5 flex min-w-0 items-center gap-2">
+          <Button size="sm" variant="outline" className="shrink-0" onClick={(e) => { e.stopPropagation(); onJump(c.place, c.repo); }}>
             <CornerDownLeft className="h-3 w-3" /> Open in {c.place}
           </Button>
           {isError && (
-            <span className="flex items-center gap-1 text-[11px] text-status-dead">
-              <AlertTriangle className="h-3 w-3" /> {c.cardType.toUpperCase()} — never shown as "Finished."
+            <span className="flex min-w-0 items-center gap-1 truncate text-[10.5px] text-status-dead/90">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              <span className="truncate">{c.cardType.toUpperCase()} — not "Finished."</span>
             </span>
           )}
         </div>
