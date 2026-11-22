@@ -285,3 +285,44 @@ lands in the wrong place.
 
 Still true: an empty title makes the item invisible (D-020), and the app must be launched
 as a bundle — a raw binary from a shell never registers a status item.
+
+---
+
+## Session 9 — blueprint-driven rebuild
+
+The user supplied a full functional analysis of AgentDock 1.5.5 (19 sections, evidence
+tagged [V]/[S]/[I]/[B]). It is now the product spec in `docs/blueprint/`:
+
+| File | Contents |
+|---|---|
+| `00-overview.md` | parity table, the five design principles |
+| `10-requirements.md` | F1–F13, N1–N7, and the exact hook contract |
+| `20-ui-spec.md` | surfaces, colour tokens, card anatomy, keys |
+| `30-acceptance.md` | Given/When/Then suite from the analysis |
+| `40-roadmap.md` | P0–P6 with our status |
+
+### Fixed: the hook contract was wrong
+
+We installed `PreToolUse` and emitted `permissionDecision`. Real Claude Code blocks on
+`PermissionRequest` and reads `decision.behavior` — so our answering would have been ignored
+in a live session. Now:
+
+- events installed: `PermissionRequest` (blocking), plus Notification / PostToolUse / Stop /
+  SubagentStop / SessionStart / SessionEnd / UserPromptSubmit
+- allow → `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}`
+- deny → `behavior:"deny"` + "The user declined this in AgentWatch."
+- question → `behavior:"allow"` + `updatedInput.answers` keyed by question text
+- helper wait 3600 s, app holds 3630 s, so the helper always gives up first
+- verified output from the real binary:
+  `{"hookSpecificOutput":{"decision":{"behavior":"allow"},"hookEventName":"PermissionRequest"}}`
+
+Bug found while wiring it: the server wrapped the already-tagged enum, producing
+`{"decision":{"decision":"allow"}}`, so the helper saw no decision. Fixed.
+
+### Added: the edge strip
+
+A second Tauri window, 44 pt wide, transparent, always-on-top, no shadow, pinned to the
+right edge of the active monitor and vertically centred. One dark pill per agent (max 14,
+then `+N`), dot colour = status, vendor ring. Click reveals the window via `focus_agent`.
+
+Next on this track: the hover card (strip → card without stealing focus), then the Inbox panel.
