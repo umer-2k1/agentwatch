@@ -15,9 +15,9 @@
       {
         "label": "main",
         "title": "AgentWatch",
-        "width": 1100,
-        "height": 740,
-        "minWidth": 880,
+        "width": 496,
+        "height": 720,
+        "minWidth": 460,
         "minHeight": 560,
         "resizable": true,
         "center": true,
