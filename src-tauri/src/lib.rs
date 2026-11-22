@@ -125,6 +125,17 @@ fn answer(store: tauri::State<SharedStore>, session_id: String, decision: String
         .unwrap_or(false)
 }
 
+/// Reveal the main window and focus one agent (the strip calls this on click).
+#[tauri::command]
+fn focus_agent(app: tauri::AppHandle, session_id: String) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+    let _ = app.emit("focus-agent", session_id);
+}
+
 /// Take back an answer that is still inside its undo window.
 #[tauri::command]
 fn undo_answer(store: tauri::State<SharedStore>, session_id: String) -> bool {
@@ -227,6 +238,7 @@ pub fn run() {
             hooks_install,
             hooks_uninstall,
             answer,
+            focus_agent,
             undo_answer,
             undoable,
             awaiting
