@@ -188,6 +188,46 @@ pub fn run() {
 
             app.on_menu_event(|app, event| tray::on_menu_event(app, event));
 
+            // ---- the edge strip -------------------------------------------------
+            // A 44 pt transparent column on the right edge, vertically centred. It must
+            // never paint a background (it once shipped as a black bar across the
+            // desktop) and must never be positioned by default (Tauri centres it).
+            match app.get_webview_window("strip") {
+                Some(strip) => {
+                    let monitor = strip
+                        .current_monitor()
+                        .ok()
+                        .flatten()
+                        .or_else(|| app.primary_monitor().ok().flatten());
+                    match monitor {
+                        Some(m) => {
+                            let scale = m.scale_factor();
+                            let mw = m.size().width as f64 / scale;
+                            let mh = m.size().height as f64 / scale;
+                            let h = 640.0_f64.min(mh - 140.0);
+                            let _ = strip.set_size(tauri::PhysicalSize::new(
+                                (44.0 * scale) as u32,
+                                (h * scale) as u32,
+                            ));
+                            let _ = strip.set_position(tauri::PhysicalPosition::new(
+                                ((mw - 44.0) * scale) as i32,
+                                (((mh - h) / 2.0) * scale) as i32,
+                            ));
+                            let _ = strip.show();
+                            eprintln!(
+                                "AgentWatch: strip placed at {:?} size 44x{} on {:.0}x{:.0}",
+                                strip.outer_position(),
+                                h,
+                                mw,
+                                mh
+                            );
+                        }
+                        None => eprintln!("AgentWatch: strip has no monitor"),
+                    }
+                }
+                None => eprintln!("AgentWatch: no strip window in config"),
+            }
+
             // Hook events. A failure to listen must never stop the app: the board still
             // works read-only (that is the whole point of having a file layer at all).
             let (tx, rx) = channel::<Pending>();
