@@ -30,9 +30,17 @@ export function Strip() {
     await window.__TAURI__!.core.invoke("focus_agent", { sessionId: id });
   }
 
+  // The strip is ambient: only work that is happening or waiting on you earns a dot.
+  // Idle/unknown sessions stay in the window; putting 29 dots on the desktop is noise.
+  const visible = sessions
+    .filter((s) => s.status === "needsYou" || s.status === "working" || s.status === "done" || s.status === "dead")
+    .slice(0, 8);
+
+  if (!visible.length) return <div className="h-screen w-full bg-transparent" />;
+
   return (
     <div className="flex h-screen w-full flex-col items-center justify-center gap-1.5 bg-transparent">
-      {sessions.slice(0, 14).map((s) => {
+      {visible.map((s) => {
         const v = vendorOf(s.provider);
         return (
           <button
@@ -61,9 +69,9 @@ export function Strip() {
           </button>
         );
       })}
-      {sessions.length > 14 && (
+      {sessions.filter((s) => s.status === "needsYou" || s.status === "working").length > 8 && (
         <span className="mt-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] text-white/60">
-          +{sessions.length - 14}
+          +{sessions.filter((s) => s.status === "needsYou" || s.status === "working").length - 8}
         </span>
       )}
     </div>

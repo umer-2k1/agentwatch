@@ -119,3 +119,9 @@
   .brand-gemini { --brand: var(--brand-gemini); }
   .brand-copilot { --brand: var(--brand-copilot); }
 }
+
+/* The edge strip window is transparent: it must never paint a background, or it becomes a
+   black bar across the desktop (shipped once, never again). */
+html:has(body.strip-body), body.strip-body { background: transparent !important; }
+body.strip-body #strip-root { background: transparent !important; }
+body.strip-body { overflow: hidden; }
