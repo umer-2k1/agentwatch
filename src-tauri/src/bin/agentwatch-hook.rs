@@ -17,15 +17,16 @@ fn main() {
 }
 
 fn run() -> Option<()> {
-    let mut payload = String::new();
-    std::io::stdin().read_to_string(&mut payload).ok()?;
+    let mut raw = String::new();
+    std::io::stdin().read_to_string(&mut raw).ok()?;
 
-    let ev = agentwatch_lib::hooks::forward::to_event(&payload)?;
+    let ev = agentwatch_lib::hooks::forward::to_event(&raw)?;
+    let payload: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
 
     let decision = agentwatch_lib::hooks::forward::deliver(&socket_path(), &ev);
     if let Some(d) = decision {
-        if let Some(out) = d.hook_output() {
-            println!("{}", out);
+        if let Some(out) = agentwatch_lib::hooks::event::hook_output(&ev.event, &d, &payload) {
+            println!("{out}");
         }
     }
     None

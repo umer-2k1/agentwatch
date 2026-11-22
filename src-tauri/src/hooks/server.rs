@@ -20,7 +20,9 @@ use super::event::{Decision, HookEvent};
 
 /// How long the app will hold a `PreToolUse` connection waiting for a human.
 /// The helper times out slightly earlier, so it is always the helper that gives up first.
-pub const DECISION_TIMEOUT: Duration = Duration::from_millis(15_000);
+/// Claude Code's own timeout for `PermissionRequest` is 3600 s. We hold slightly longer than
+/// the helper so the helper always gives up first (see `WAIT_TIMEOUT`).
+pub const DECISION_TIMEOUT: Duration = Duration::from_secs(3630);
 
 /// An event plus, for decision-capable events, the channel to answer on.
 pub struct Pending {
@@ -95,7 +97,10 @@ fn handle(mut stream: std::os::unix::net::UnixStream, tx: Sender<Pending>) {
     let decision = reply_rx
         .recv_timeout(DECISION_TIMEOUT)
         .unwrap_or(Decision::Ask);
-    let body = serde_json::json!({ "decision": decision });
+    // Decision is already internally tagged (`{"decision":"allow"}`) — wrapping it again
+    // produced `{"decision":{"decision":"allow"}}` and the helper saw no decision.
+    let body = serde_json::to_value(&decision)
+        .unwrap_or_else(|_| serde_json::json!({ "decision": "ask" }));
     let mut out = body.to_string();
     out.push('\n');
     let _ = stream.write_all(out.as_bytes());

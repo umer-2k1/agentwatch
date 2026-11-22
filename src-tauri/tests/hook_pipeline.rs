@@ -151,7 +151,8 @@ fn helper_exits_zero_when_no_app_is_running() {
         .env("AGENTWATCH_SOCKET", "/nonexistent/agentwatch.sock")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
+        .env("AGENTWATCH_DEBUG", "1")
         .spawn()
         .expect("spawn helper");
 
@@ -203,7 +204,8 @@ fn answering_a_pre_tool_use_returns_a_permission_decision() {
         .env("AGENTWATCH_SOCKET", &socket)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
+        .env("AGENTWATCH_DEBUG", "1")
         .spawn()
         .expect("spawn helper");
 
@@ -212,7 +214,7 @@ fn answering_a_pre_tool_use_returns_a_permission_decision() {
         .as_mut()
         .unwrap()
         .write_all(
-            br#"{"hook_event_name":"PreToolUse","session_id":"dec1","tool_name":"Bash",
+            br#"{"hook_event_name":"PermissionRequest","session_id":"dec1","tool_name":"Bash",
                  "message":"Claude wants to run npm test"}"#,
         )
         .unwrap();
@@ -225,8 +227,9 @@ fn answering_a_pre_tool_use_returns_a_permission_decision() {
     println!("helper printed: {}", stdout.trim());
 
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid hook output");
-    assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "allow");
-    assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    // The PermissionRequest contract: decision.behavior, not permissionDecision.
+    assert_eq!(v["hookSpecificOutput"]["decision"]["behavior"], "allow");
+    assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PermissionRequest");
 
     let _ = fs::remove_dir_all(&dir);
 }
@@ -255,7 +258,8 @@ fn an_unanswered_hook_falls_back_to_the_terminal_prompt() {
         .env("AGENTWATCH_WAIT_MS", "250")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
+        .env("AGENTWATCH_DEBUG", "1")
         .spawn()
         .expect("spawn helper");
 
@@ -263,7 +267,7 @@ fn an_unanswered_hook_falls_back_to_the_terminal_prompt() {
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(br#"{"hook_event_name":"PreToolUse","session_id":"dec2","tool_name":"Bash"}"#)
+        .write_all(br#"{"hook_event_name":"PermissionRequest","session_id":"dec2","tool_name":"Bash"}"#)
         .unwrap();
 
     let out = child.wait_with_output().unwrap();

@@ -10,31 +10,78 @@ use serde::{Deserialize, Serialize};
 ///
 /// `Ask` is the safe default: it hands control back to Claude Code's own terminal prompt,
 /// which is exactly what would have happened if AgentWatch were not running at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "decision", rename_all = "lowercase")]
 pub enum Decision {
     Allow,
     Deny,
+    /// Choose option N of an `AskUserQuestion` (0-based).
+    Choose { index: usize },
+    /// No opinion — print nothing and let the agent prompt normally.
     Ask,
 }
 
-impl Decision {
-    /// The wire form Claude Code understands for a `PreToolUse` hook.
-    pub fn hook_output(&self) -> Option<serde_json::Value> {
-        let decision = match self {
-            Decision::Allow => "allow",
-            Decision::Deny => "deny",
-            // Emitting nothing is how a hook says "I have no opinion".
-            Decision::Ask => return None,
-        };
-        Some(serde_json::json!({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": decision,
-                "permissionDecisionReason": "Answered in AgentWatch"
+/// Build the JSON a hook must print on stdout.
+///
+/// Two different contracts exist and mixing them makes Claude ignore the answer:
+///
+/// * `PermissionRequest` → `decision.behavior` (+ `updatedInput` when answering a question)
+/// * `PreToolUse`        → `permissionDecision`
+///
+/// We only ever install `PermissionRequest`, because it is the event Claude blocks on.
+pub fn hook_output(
+    event: &str,
+    decision: &Decision,
+    payload: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let inner = match decision {
+        Decision::Ask => return None,
+
+        Decision::Allow => serde_json::json!({ "behavior": "allow" }),
+
+        Decision::Deny => serde_json::json!({
+            "behavior": "deny",
+            "message": "The user declined this in AgentWatch."
+        }),
+
+        Decision::Choose { index } => {
+            // Questions arrive as PermissionRequest with tool_name AskUserQuestion.
+            // Answering = allow + updatedInput.answers (question text → chosen label).
+            let mut updated = payload
+                .get("tool_input")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({}));
+
+            if let Some(questions) = updated.get("questions").and_then(|q| q.as_array()).cloned() {
+                if let Some(q) = questions.first() {
+                    let label = q
+                        .get("options")
+                        .and_then(|o| o.as_array())
+                        .and_then(|opts| opts.get(*index))
+                        .and_then(|o| o.get("label"))
+                        .and_then(|l| l.as_str())
+                        .unwrap_or("");
+                    let question = q
+                        .get("question")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("answer");
+                    if !label.is_empty() {
+                        updated["answers"] =
+                            serde_json::json!({ question: label });
+                    }
+                }
             }
-        }))
-    }
+
+            serde_json::json!({ "behavior": "allow", "updatedInput": updated })
+        }
+    };
+
+    Some(serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": event,
+            "decision": inner
+        }
+    }))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,11 +120,16 @@ impl HookEvent {
 
     /// Can this event carry a decision back to the agent?
     ///
-    /// Only `PreToolUse` can: it is the hook Claude Code blocks on and reads a
-    /// `permissionDecision` from. `Notification` is fire-and-forget, so answering there
-    /// would do nothing.
+    /// Only `PermissionRequest`: it is the hook Claude Code **blocks on** (up to 3600 s)
+    /// and reads a `decision.behavior` from. `PreToolUse` fires for every tool call and
+    /// `Notification` is fire-and-forget — answering either would do nothing.
     pub fn wants_decision(&self) -> bool {
-        self.event == "PreToolUse"
+        self.event == "PermissionRequest"
+    }
+
+    /// Is this a question rather than a yes/no permission?
+    pub fn is_question(&self) -> bool {
+        self.tool_name.as_deref() == Some("AskUserQuestion")
     }
 
     pub fn detail(&self) -> String {
@@ -141,24 +193,53 @@ mod tests {
     }
 
     #[test]
-    fn only_pre_tool_use_carries_a_decision() {
-        assert!(ev(r#"{"event":"PreToolUse","session_id":"a"}"#).wants_decision());
+    fn only_permission_request_carries_a_decision() {
+        assert!(ev(r#"{"event":"PermissionRequest","session_id":"a"}"#).wants_decision());
+        assert!(!ev(r#"{"event":"PreToolUse","session_id":"a"}"#).wants_decision());
         assert!(!ev(r#"{"event":"Notification","session_id":"a"}"#).wants_decision());
-        assert!(!ev(r#"{"event":"Stop","session_id":"a"}"#).wants_decision());
     }
 
     #[test]
-    fn allow_and_deny_serialise_for_claude() {
-        let allow = Decision::Allow.hook_output().unwrap();
-        assert_eq!(allow["hookSpecificOutput"]["permissionDecision"], "allow");
-        let deny = Decision::Deny.hook_output().unwrap();
-        assert_eq!(deny["hookSpecificOutput"]["permissionDecision"], "deny");
+    fn allow_uses_the_permission_request_contract() {
+        let p = serde_json::json!({});
+        let out = hook_output("PermissionRequest", &Decision::Allow, &p).unwrap();
+        assert_eq!(out["hookSpecificOutput"]["hookEventName"], "PermissionRequest");
+        assert_eq!(out["hookSpecificOutput"]["decision"]["behavior"], "allow");
+    }
+
+    #[test]
+    fn deny_carries_the_message_claude_shows() {
+        let p = serde_json::json!({});
+        let out = hook_output("PermissionRequest", &Decision::Deny, &p).unwrap();
+        assert_eq!(out["hookSpecificOutput"]["decision"]["behavior"], "deny");
+        assert!(out["hookSpecificOutput"]["decision"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("declined"));
+    }
+
+    #[test]
+    fn choosing_an_option_answers_the_question() {
+        // The exact shape Claude Code expects for AskUserQuestion (doc §7.1).
+        let payload = serde_json::json!({
+            "tool_name": "AskUserQuestion",
+            "tool_input": { "questions": [{
+                "question": "Which greeting language?",
+                "options": [{ "label": "English" }, { "label": "German" }, { "label": "French" }]
+            }]}
+        });
+        let out = hook_output("PermissionRequest", &Decision::Choose { index: 2 }, &payload).unwrap();
+        assert_eq!(out["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert_eq!(
+            out["hookSpecificOutput"]["decision"]["updatedInput"]["answers"]["Which greeting language?"],
+            "French"
+        );
     }
 
     #[test]
     fn ask_emits_nothing_so_the_terminal_still_prompts() {
-        // The safe default must be indistinguishable from AgentWatch not being installed.
-        assert!(Decision::Ask.hook_output().is_none());
+        let p = serde_json::json!({});
+        assert!(hook_output("PermissionRequest", &Decision::Ask, &p).is_none());
     }
 
     #[test]

@@ -24,7 +24,7 @@ pub const ACK_TIMEOUT: Duration = Duration::from_millis(400);
 ///
 /// Shorter than the app's own timeout on purpose: the helper must always be the one that
 /// gives up first, so the agent is never left waiting on a socket that will not speak.
-pub const WAIT_TIMEOUT: Duration = Duration::from_millis(13_000);
+pub const WAIT_TIMEOUT: Duration = Duration::from_secs(3600);
 
 /// Normalise a raw payload. Returns `None` when there is nothing useful in it.
 pub fn to_event(payload: &str) -> Option<HookEvent> {
@@ -82,6 +82,9 @@ pub fn deliver(socket: &std::path::Path, ev: &HookEvent) -> Option<super::event:
     let _ = BufReader::new(stream).read_line(&mut reply);
 
     let reply = reply.trim();
+    if std::env::var("AGENTWATCH_DEBUG").is_ok() {
+        eprintln!("[agentwatch-hook] reply={reply:?}");
+    }
     if reply.is_empty() || reply == "ok" {
         return None;
     }
@@ -89,6 +92,9 @@ pub fn deliver(socket: &std::path::Path, ev: &HookEvent) -> Option<super::event:
         Ok(v) => match v.get("decision").and_then(|d| d.as_str()) {
             Some("allow") => Some(super::event::Decision::Allow),
             Some("deny") => Some(super::event::Decision::Deny),
+            Some("choose") => Some(super::event::Decision::Choose {
+                index: v.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as usize,
+            }),
             _ => None,
         },
         Err(_) => None,
