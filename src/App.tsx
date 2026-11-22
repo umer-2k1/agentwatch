@@ -83,7 +83,7 @@ export default function App() {
   return (
     <div className="app-canvas flex h-full flex-col overflow-hidden">
       {/* 36 px chrome bar — no sidebar, exactly like AgentDock's panel */}
-      <header className="glass flex h-[38px] shrink-0 items-center gap-1 border-b border-white/[0.06] pl-[86px] pr-2.5">
+      <header className="glass flex h-[38px] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2.5">
         <span className="mr-1 h-1.5 w-1.5 rounded-full bg-primary" />
         <span className="text-[12px] font-semibold tracking-tight">AgentWatch</span>
 
