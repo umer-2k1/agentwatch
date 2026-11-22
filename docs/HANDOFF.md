@@ -326,3 +326,46 @@ right edge of the active monitor and vertically centred. One dark pill per agent
 then `+N`), dot colour = status, vendor ring. Click reveals the window via `focus_agent`.
 
 Next on this track: the hover card (strip → card without stealing focus), then the Inbox panel.
+
+---
+
+## Session 10 — full AgentDock parity build (from the blueprint)
+
+**Verified running on the user's Mac** (screenshot: `docs/assets/ui-sessions-live.png`):
+the Sessions grid renders real sessions, five `testbed` sessions correctly show
+`dead` + **"Login expired · Please run /login"**, one session shows `working` with
+"tool 'turn' still running", and the edge strip is visible on the right.
+
+### Backend (all committed, 77 tests green)
+
+| Module | What it does |
+|---|---|
+| `model.rs` | Session/InboxCard/TurnRecord/FileEdit/Subagent/Collision + error_kind |
+| `collisions.rs` | `same_file` (20 min) + `same_checkout` detection, `who_edits` report, locks |
+| `activity.rs` | 365-day heatmap, day lanes, leverage, wait buckets, model share, records |
+| `pty_manager.rs` | spawn claude/opencode/codex/shell in a PTY, ring buffer, prompt detection, worktree isolation |
+| `hosts.rs` | 30-agent catalog, 13-host prober (cmux capability probe + OpenCode v2 schema probe), jump-to-host |
+| `mcp.rs` | 8-tool MCP JSON-RPC server + `~/.claude.json` registration |
+| `iphone.rs` | LAN HTTP server `:47811`, bearer token, mobile Inbox UI |
+| `tray.rs` | native menu: Ask/Inbox/Activity/Sessions/Settings/Tour/Diagnostics |
+| `store.rs` | Inbox cards, 2 s undo with countdown, turns, collisions, Activity |
+
+### Hook contract (fixed against real Claude Code)
+
+`PermissionRequest` → `{"hookSpecificOutput":{"decision":{"behavior":"allow"}}}`.
+Questions → `updatedInput.answers`. Helper waits 3600 s, app holds 3630 s.
+
+### Frontend (React + Tailwind + shadcn)
+
+- `Sidebar` (Sessions · Inbox · Activity · Settings + shortcut legend)
+- `SessionsView` — filter chips, live tiles, `+ New session` with worktree option
+- `InboxView` — permission/question/elsewhere/finished/auth cards, digits, J/K, 2 s undo bar
+- `ActivityView` — heatmap, day stepper, at-once line, lanes, leverage, waits, models, records
+- `SettingsView` — 7 tabs with live preview
+- `Strip` — compact transparent capsule, transparent page background
+
+### Known gaps
+1. Strip still shows a dark pill background rather than pure dots — `macOSPrivateApi` is
+   enabled and the page forces `background: transparent`, but needs visual verification.
+2. Inbox screenshot not yet captured (user was using the machine; synthetic clicks landed in Chrome).
+3. `activity.rs` synthesises some values (leverage ratio, subagent split) — mark as estimated.
