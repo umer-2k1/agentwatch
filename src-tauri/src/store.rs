@@ -371,6 +371,9 @@ impl Store {
         self.settle_expired_undos(now);
 
         let waiting = self.waiting.clone();
+        let queued = self.queued_messages.clone();
+        let seen_at = self.seen_at_ms.clone();
+        let settings = self.settings;
         let mut liveness = std::mem::take(&mut self.liveness);
         let mut out: Vec<Session> = Vec::new();
 
@@ -378,8 +381,8 @@ impl Store {
             for fact in p.poll(now) {
                 let live = liveness.check_cwd(&fact.cwd);
                 let hook = waiting.get(&fact.id).map(|s| s.as_str());
-                let mut sess = resolve(&fact, &live, hook, now, self.settings);
-                self.decorate_session(&mut sess);
+                let mut sess = resolve(&fact, &live, hook, now, settings);
+                decorate(&mut sess, &queued, &seen_at);
                 out.push(sess);
             }
         }
@@ -391,8 +394,8 @@ impl Store {
                 pid: None,
             };
             let hook = waiting.get(&fact.id).map(|s| s.as_str());
-            let mut sess = resolve(&fact, &live, hook, now, self.settings);
-            self.decorate_session(&mut sess);
+            let mut sess = resolve(&fact, &live, hook, now, settings);
+            decorate(&mut sess, &queued, &seen_at);
             out.push(sess);
         }
 
@@ -406,22 +409,6 @@ impl Store {
         self.prune_waiting();
         self.sync_turns_from_sessions(now);
         &self.last
-    }
-
-    fn decorate_session(&self, sess: &mut Session) {
-        if let Some(q) = self.queued_messages.get(&sess.fact.id) {
-            sess.queued_messages = q.clone();
-        }
-        // If the user marked this session seen at or after its last activity, Done becomes Idle
-        // (Blueprint §4.1, Figure 51).
-        if let Some(&seen_ms) = self.seen_at_ms.get(&sess.fact.id) {
-            if seen_ms >= sess.fact.last_activity_ms {
-                sess.seen = true;
-                if sess.status == Status::Done {
-                    sess.status = Status::Idle;
-                }
-            }
-        }
     }
 
     fn sync_turns_from_sessions(&mut self, now: i64) {
@@ -761,6 +748,30 @@ impl Store {
                     .count(),
             })
             .collect()
+    }
+}
+
+/// Apply queue and seen-state decoration to a resolved session.
+///
+/// A free function rather than a method: `tick` holds `providers` mutably, so it cannot also
+/// borrow `self` immutably.
+fn decorate(
+    sess: &mut Session,
+    queued: &HashMap<String, Vec<String>>,
+    seen_at: &HashMap<String, i64>,
+) {
+    if let Some(q) = queued.get(&sess.fact.id) {
+        sess.queued_messages = q.clone();
+    }
+    // If the user marked this session seen at or after its last activity, Done becomes Idle
+    // (Blueprint §4.1, Figure 51).
+    if let Some(&seen_ms) = seen_at.get(&sess.fact.id) {
+        if seen_ms >= sess.fact.last_activity_ms {
+            sess.seen = true;
+            if sess.status == Status::Done {
+                sess.status = Status::Idle;
+            }
+        }
     }
 }
 

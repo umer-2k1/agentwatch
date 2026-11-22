@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core only. AgentWatch does not open external URLs, and every permission we do not need is one we should not hold.",
-  "windows": ["main"],
+  "description": "Main and strip windows: core only.",
+  "windows": ["main", "strip"],
   "permissions": ["core:default"]
 }
