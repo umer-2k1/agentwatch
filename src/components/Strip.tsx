@@ -4,14 +4,13 @@ import { vendorOf, type Session } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * The edge strip.
+ * The edge strip — a compact vertical capsule of status dots (Blueprint §4.1, Figure 25b).
  *
- * A 44 pt transparent column pinned to the right edge of the screen. Each agent is one dot
- * inside a dark pill; hovering grows the pill slightly, clicking reveals the window focused
- * on that agent. This is the surface the product is named for — everything else is detail.
+ * Idle/unknown sessions stay in the window; only live work earns a dot.
  */
 export function Strip() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     let stop: undefined | (() => void);
@@ -30,8 +29,6 @@ export function Strip() {
     await window.__TAURI__!.core.invoke("focus_agent", { sessionId: id });
   }
 
-  // The strip is ambient: only work that is happening or waiting on you earns a dot.
-  // Idle/unknown sessions stay in the window; putting 29 dots on the desktop is noise.
   const visible = sessions
     .filter((s) => s.status === "needsYou" || s.status === "working" || s.status === "done" || s.status === "dead")
     .slice(0, 8);
@@ -39,41 +36,40 @@ export function Strip() {
   if (!visible.length) return <div className="h-screen w-full bg-transparent" />;
 
   return (
-    <div className="flex h-screen w-full flex-col items-center justify-center gap-1.5 bg-transparent">
-      {visible.map((s) => {
-        const v = vendorOf(s.provider);
-        return (
-          <button
-            key={s.id}
-            onClick={() => open(s.id)}
-            title={`${s.repo || s.title} — ${s.status}`}
-            className={cn(
-              "group flex h-[22px] w-[22px] items-center justify-center rounded-full",
-              "bg-black/55 backdrop-blur-md transition-all hover:h-[24px] hover:w-[24px]",
-              "ring-1 ring-white/10"
-            )}
-          >
-            <span
-              className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                s.status === "working" && "bg-status-working",
-                s.status === "needsYou" && "bg-status-needsYou animate-pulse-ring",
-                s.status === "done" && "bg-status-done",
-                s.status === "idle" && "bg-status-idle/70",
-                s.status === "dead" && "bg-status-dead",
-                s.status === "unknown" && "border-2 border-dashed border-status-unknown bg-transparent",
-                v.className
-              )}
-              style={{ boxShadow: "0 0 0 1.5px hsl(var(--brand, transparent) / 0.8)" }}
-            />
-          </button>
-        );
-      })}
-      {sessions.filter((s) => s.status === "needsYou" || s.status === "working").length > 8 && (
-        <span className="mt-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] text-white/60">
-          +{sessions.filter((s) => s.status === "needsYou" || s.status === "working").length - 8}
-        </span>
-      )}
+    <div className="flex h-screen w-full items-center justify-center bg-transparent">
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={cn(
+          "flex flex-col items-center gap-[5px] rounded-full px-[5px] py-[7px]",
+          "bg-black/70 ring-1 ring-white/10 backdrop-blur-md transition-all",
+          hovered && "bg-black/85 ring-white/20"
+        )}
+      >
+        {visible.map((s) => {
+          const v = vendorOf(s.provider);
+          return (
+            <button
+              key={s.id}
+              onClick={() => open(s.id)}
+              title={`${s.repo || s.title} — ${s.status}`}
+              className="grid h-3.5 w-3.5 place-items-center rounded-full transition-transform hover:scale-125"
+            >
+              <span
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full",
+                  s.status === "working" && "bg-status-working",
+                  s.status === "needsYou" && "bg-status-needsYou animate-pulse-ring",
+                  s.status === "done" && "bg-status-done",
+                  s.status === "dead" && "bg-status-dead",
+                  v.className
+                )}
+                style={{ boxShadow: "0 0 0 1.2px hsl(var(--brand, rgba(255,255,255,.35)) / 0.9)" }}
+              />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
