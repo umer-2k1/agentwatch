@@ -83,12 +83,12 @@ export function InboxView({
   return (
     <div className="flex h-full flex-col">
       {/* header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3.5 py-2.5">
         <div className="flex rounded-lg bg-black/25 p-0.5">
           <button
             onClick={() => setTab("inbox")}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] transition-colors",
+              "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] transition-colors",
               tab === "inbox" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -203,10 +203,12 @@ function Card({
     <div
       onClick={onSelect}
       className={cn(
-        "mb-2 cursor-pointer rounded-xl border p-3.5 transition-all",
-        selected ? "border-primary/60 bg-primary/[0.04]" : "border-border/70 bg-card/60 hover:border-border",
-        c.cardType === "permission" && "border-status-needsYou/40 bg-status-needsYou/[0.06]",
-        isError && "border-status-dead/40 bg-status-dead/[0.06]"
+        "mb-2.5 cursor-pointer rounded-[18px] border px-4 py-3.5 transition-all",
+        "border-white/[0.07] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.055]",
+        selected && "border-primary/50",
+        c.cardType === "permission" &&
+          "border-status-needsYou/35 bg-gradient-to-b from-status-needsYou/[0.11] to-status-needsYou/[0.045]",
+        isError && "border-status-dead/35 bg-gradient-to-b from-status-dead/[0.09] to-status-dead/[0.03]"
       )}
     >
       {/* card header */}
@@ -217,11 +219,10 @@ function Card({
           size="sm"
         />
         <span className="truncate font-medium text-foreground">{c.title}</span>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
-          <span className="truncate max-w-[140px]">{c.repo} ⎇ {c.branch}</span>
-          <span>·</span>
-          <span>{age(c.ageS)}</span>
-          <span className="rounded bg-white/8 px-1.5 py-px text-[10px]">{c.place}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground">
+          <span className="truncate max-w-[130px] opacity-80">{c.repo}</span>
+          <span className="rounded-md bg-white/[0.07] px-1.5 py-px text-[9.5px]">{c.place}</span>
+          <span className="w-8 text-right font-mono text-[10px]">{age(c.ageS)}</span>
         </span>
       </div>
 
@@ -256,8 +257,8 @@ function Card({
                 onAnswer(c.id, decision, `${o.number}. ${o.label}`);
               }}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-[12px] transition-colors",
-                "border-border/60 bg-black/20 hover:border-primary/50 hover:bg-primary/10",
+                "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left text-[12.5px] transition-colors",
+                "border-white/[0.08] bg-white/[0.03] hover:border-primary/45 hover:bg-primary/[0.08]",
                 c.state === "pending_undo" && "opacity-60"
               )}
             >
@@ -276,7 +277,7 @@ function Card({
       {/* finished card actions */}
       {c.cardType === "finished" && (
         <div className="mt-2.5 space-y-1.5">
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-black/20 px-2.5 py-1.5">
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
             <MessageSquare className="h-3 w-3 text-muted-foreground" />
             <input
               value={reply}
