@@ -61,6 +61,17 @@ pub fn resolve(
                 },
             },
         )
+    } else if let Some(err_kind) = &fact.error_kind {
+        // Blueprint §9 Bug 3, §15: failed turns (Login expired, Insufficient balance)
+        // must never resolve to Done ("Finished.").
+        (
+            Status::Dead,
+            Confidence::Certain,
+            Evidence {
+                kind: EvidenceKind::Transcript,
+                detail: format!("error:{err_kind} — {}", fact.last_words),
+            },
+        )
     } else if let Some(detail) = hook_waiting {
         // Rule 3 — the only signal a transcript can never produce. `certain`, because the
         // agent itself said so.
@@ -148,6 +159,9 @@ pub fn resolve(
         pid: live.pid,
         quiet_for_s,
         turn_age_s: fact.turn_started_ms.map(|t| ((now_ms - t).max(0)) / 1000),
+        collisions: Vec::new(),
+        queued_messages: Vec::new(),
+        seen: false,
     }
 }
 
@@ -303,6 +317,17 @@ mod tests {
             Settings::default(),
         );
         assert_eq!(s.status, Status::Dead, "a dead agent is not waiting on you");
+    }
+
+    #[test]
+    fn auth_error_turn_resolves_to_dead_not_done() {
+        let mut f = fact();
+        f.turn_closed = true;
+        f.error_kind = Some("auth".into());
+        f.last_words = "Login expired · Please run /login".into();
+        let s = resolve(&f, &alive(Some(true)), None, NOW, Settings::default());
+        assert_eq!(s.status, Status::Dead, "auth error must never report as Done");
+        assert!(s.evidence.detail.contains("error:auth"));
     }
 
     #[test]

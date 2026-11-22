@@ -155,8 +155,11 @@ fn fact_from_row(r: Row) -> SessionFact {
         cost_usd: None,
         tokens_in: 0,
         tokens_out: 0,
+        place: "OpenCode".into(),
+        origin: "discovered".into(),
         is_sidechain: false,
         readable: true,
+        ..Default::default()
     }
 }
 
