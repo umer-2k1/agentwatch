@@ -12,5 +12,10 @@ export default defineConfig({
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
   },
-  build: { outDir: "dist", emptyOutDir: true, target: "safari15" },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+    target: "safari15",
+    rollupOptions: { input: { main: "index.html", strip: "strip.html" } },
+  },
 });
